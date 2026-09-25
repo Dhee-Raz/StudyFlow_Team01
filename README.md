@@ -1,26 +1,25 @@
-# StudyFlow — Smart Study Planner
+# StudyFlow — Courses Home Screen
 
-A tool that generates a personalized study schedule using spaced repetition.
+Initial Flask UI with a Courses navigation link and a friendly empty state.
+This branch contains the home screen only. Course storage and forms will be added in later changes.
 
-## Prerequisites
-- Python 3.8+
-- Git
+## Run locally
 
-## Setup
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
+```
 
-1. Clone the repo:
-   git clone https://github.com/Dhiraj02929130/StudyFlow_Team01.git
-   cd StudyFlow_Team01
+Open http://127.0.0.1:5002.
 
-2. Create and activate a virtual environment:
-   python3 -m venv .venv
-   source .venv/bin/activate
+## Code map
 
-3. Install dependencies:
-   pip install -r requirements.txt
+- `app.py`: Flask setup and the home route.
+- `templates/base.html`: page shell, logo, and navigation.
+- `templates/index.html`: Courses heading and empty state.
+- `static/style.css`: theme, layout, navigation, and empty-state styling.
+- `static/*.png`: logo and browser icons.
 
-4. Run the app:
-   python app.py
-
-## Status
-Sprint 1 — Project skeleton with hello world route.
+The server renders this page without querying a database.

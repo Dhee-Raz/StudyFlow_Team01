@@ -1,0 +1,14 @@
+{# Initial empty state; course forms and database queries are added separately. #}
+{% extends "base.html" %}
+{% block title %}Courses - StudyFlow{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1>Your Courses</h1>
+    <p>Everything you're taking, all in one place.</p>
+  </div>
+  <div class="empty-state">
+    <span class="icon" aria-hidden="true">🎓</span>
+    <h2>No courses yet</h2>
+    <p>Your courses will appear here once they're added.</p>
+  </div>
+{% endblock %}
