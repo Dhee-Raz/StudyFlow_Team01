@@ -1,6 +1,14 @@
 from flask import Flask
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from models import db, Course, Assignment
 
+
+@event.listens_for(Engine, "connect")
+def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///studyflow.db'
