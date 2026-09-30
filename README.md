@@ -24,3 +24,9 @@ A tool that generates a personalized study schedule using spaced repetition.
 
 ## Status
 Sprint 1 — Project skeleton with hello world route.
+
+## Courses UI
+
+Run `python app.py` and open http://127.0.0.1:5001.
+The styled Courses page and Add Course form are available. Add Assignment,
+Schedule, and Connect Canvas currently display “Coming soon.”
