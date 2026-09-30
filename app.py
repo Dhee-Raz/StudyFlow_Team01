@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, render_template
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from models import db, Course, Assignment
@@ -21,6 +21,11 @@ with app.app_context():
 @app.route("/")
 def hello():
     return "Hello, StudyFlow!"
+
+@app.route("/dashboard")
+def dashboard():
+    tasks = Assignment.query.order_by(Assignment.due_date).all()
+    return render_template("dashboard.html", tasks=tasks)
 
 if __name__ == "__main__":
     app.run(debug=True)
