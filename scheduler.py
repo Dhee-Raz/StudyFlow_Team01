@@ -1,37 +1,53 @@
-from datetime import date, datetime
+from datetime import datetime, timedelta, timezone
 
-def generate_study_sessions(assignment, today=None):
-    """Return a list of study sessions for an assignment."""
-    if today is None:
-        today = date.today()
+
+def generate_study_sessions(assignment):
+    """
+    Generate a basic study schedule for an assignment.
+
+    Each session contains:
+    - date
+    - duration in hours
+    - assignment reference
+    """
+
+    # Handle invalid or zero estimated study time.
+    if assignment.estimated_hours <= 0:
+        return []
 
     due_date = assignment.due_date
-    hours = assignment.estimated_hours or 0
 
-    # Handle missing/bad data gracefully
-    if due_date is None or hours <= 0:
+    # Support both timezone-aware and timezone-naive datetimes.
+    if due_date.tzinfo is not None:
+        today = datetime.now(timezone.utc).date()
+    else:
+        today = datetime.now().date()
+
+    due_day = due_date.date()
+
+    days_available = (due_day - today).days
+
+    # A past due date cannot have future study sessions.
+    if days_available < 0:
         return []
-    if isinstance(due_date, datetime):
-        due_date = due_date.date()
 
-    days_available = (due_date - today).days
-    if days_available <= 0:
-        return []  # due today or already past
+    # If the assignment is due today, still create one session.
+    if days_available == 0:
+        days_available = 1
 
-    # Split the work into half-hour chunks
-    total_chunks = max(1, round(hours * 2))
-    num_sessions = min(days_available, total_chunks)
-
-    # Share chunks as evenly as possible across sessions
-    base, extra = divmod(total_chunks, num_sessions)
+    hours_per_day = assignment.estimated_hours / days_available
 
     sessions = []
-    for i in range(num_sessions):
-        day_offset = i * days_available // num_sessions  # spreads dates out
-        chunks = base + (1 if i < extra else 0)
-        sessions.append({
-            "date": today + timedelta(days=day_offset),
-            "duration": chunks * 0.5,
-            "assignment": assignment,
-        })
+
+    for day in range(days_available):
+        session_date = today + timedelta(days=day)
+
+        sessions.append(
+            {
+                "date": session_date,
+                "duration": hours_per_day,
+                "assignment": assignment,
+            }
+        )
+
     return sessions
