@@ -1,0 +1,718 @@
+/* Shared presentation for all Jinja pages. Selectors match template classes.
+   --name declares a theme variable; var(--name) reuses it. Later rules can
+   override earlier ones. Flex/grid arrange children; gap controls spacing. */
+/* Default light-theme colors and reusable design values. */
+:root {
+  --bg: #f4f5fb;
+  --surface: #ffffff;
+  --surface-muted: #f8f9fd;
+  --border: #e6e7f2;
+  --text: #14162b;
+  --text-muted: #6b7086;
+  --primary: #5b5bf0;
+  --primary-dark: #4646d6;
+  --primary-tint: #edecff;
+  --accent: #16b8a6;
+  --danger: #e0455f;
+  --danger-tint: #fdecef;
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 1px 2px rgba(20, 22, 43, 0.04), 0 8px 24px rgba(20, 22, 43, 0.06);
+  --shadow-hover: 0 4px 10px rgba(20, 22, 43, 0.06), 0 14px 32px rgba(20, 22, 43, 0.1);
+}
+
+/* Override theme values when the operating system requests dark mode. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1020;
+    --surface: #191a30;
+    --surface-muted: #20213c;
+    --border: #2c2d4a;
+    --text: #f1f1fb;
+    --text-muted: #9b9dc0;
+    --primary: #8484ff;
+    --primary-dark: #6f6ff5;
+    --primary-tint: #24244a;
+    --accent: #34d6c1;
+    --danger: #ff6b85;
+    --danger-tint: #351f28;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.25), 0 14px 32px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--primary);
+}
+
+/* Navbar */
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+}
+
+.navbar-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0.9rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.brand-logo {
+  height: 34px;
+  width: auto;
+  display: block;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.nav-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 500;
+  padding: 0.45rem 0.8rem;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-links a:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.nav-links a.active {
+  background: var(--primary-tint);
+  color: var(--primary-dark);
+}
+
+/* Layout */
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.page-header {
+  margin-bottom: 1.75rem;
+}
+
+.page-header h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.page-header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.98rem;
+}
+
+h1 {
+  letter-spacing: -0.02em;
+}
+
+/* Cards */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+.card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* Split cards (header band + body): course cards, Today card, Exams card */
+
+.course-card,
+.today-card,
+.exams-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.course-card .card-header,
+.today-card .card-header,
+.exams-card .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.course-card .card-header h2,
+.today-card .card-header h2,
+.exams-card .card-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.course-card .card-body,
+.today-card .card-body,
+.exams-card .card-body {
+  padding: 1.1rem 1.5rem 1.35rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-actions form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.icon-btn:hover {
+  background: var(--danger-tint);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.course-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Small count indicators used in card headers. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary-dark);
+  background: var(--primary-tint);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.assignment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.assignment-list li {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.94rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.assignment-list li:last-child {
+  border-bottom: none;
+}
+
+.no-assignments {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.due-soon-badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--danger);
+  background: var(--danger-tint);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+/* Deadline groups on the course dashboard. */
+.due-date-group {
+  margin-bottom: 1.1rem;
+}
+
+.due-date-group:last-child {
+  margin-bottom: 0;
+}
+
+.due-date-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+
+.assignment-list.grouped li {
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* Native expandable sections for additional dates and past assignments. */
+.more-groups {
+  margin-top: 0.25rem;
+  margin-bottom: 0.85rem;
+}
+
+.more-groups summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary-dark);
+  outline: none;
+}
+
+.more-groups summary:hover {
+  text-decoration: underline;
+}
+
+.more-groups .due-date-group:first-of-type {
+  margin-top: 0.75rem;
+}
+
+.past-assignments {
+  margin-top: 0.85rem;
+}
+
+.past-assignments summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  outline: none;
+}
+
+.past-assignments summary:hover {
+  color: var(--text);
+}
+
+.past-assignments .assignment-list {
+  margin-top: 0.5rem;
+}
+
+.assignment-list.muted li {
+  color: var(--text-muted);
+}
+
+.assignment-list.muted strong {
+  color: var(--text-muted);
+  font-weight: 500;
+  text-decoration: line-through;
+  text-decoration-color: var(--border);
+}
+
+/* Links to imported Canvas assignments, including the external-link marker. */
+.assignment-title-link {
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.assignment-title-link:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+.assignment-title-link::after {
+  content: "↗";
+  display: inline-block;
+  margin-left: 0.3em;
+  font-size: 0.75em;
+  color: var(--text-muted);
+}
+
+.assignment-list.muted .assignment-title-link {
+  color: var(--text-muted);
+  font-weight: 500;
+  text-decoration: line-through;
+  text-decoration-color: var(--border);
+}
+
+.assignment-list.muted .assignment-title-link:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+}
+
+.assignment-list.muted .assignment-title-link::after {
+  display: none;
+}
+
+.assignment-list .meta {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* Empty state */
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+}
+
+.empty-state .icon {
+  font-size: 2.25rem;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.empty-state a {
+  font-weight: 600;
+}
+
+/* Actions row */
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* Buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--surface-muted);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--danger) 85%, black);
+}
+
+/* Confirm modal */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 16, 32, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+/* Keep the HTML hidden attribute effective despite the overlay display rule. */
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-hover);
+  padding: 1.5rem;
+  max-width: 380px;
+  width: 100%;
+}
+
+.modal p {
+  margin: 0 0 1.25rem;
+  font-size: 0.96rem;
+  color: var(--text);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.card-spaced {
+  margin-bottom: 1.5rem;
+}
+
+.help-note {
+  margin-top: 1.5rem;
+  padding: 1.1rem 1.4rem;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Forms */
+
+.form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.75rem;
+  max-width: 440px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.form label {
+  font-weight: 600;
+  margin-top: 0.9rem;
+  font-size: 0.88rem;
+}
+
+.form label:first-child {
+  margin-top: 0;
+}
+
+.form input,
+.form select {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.96rem;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form input:focus,
+.form select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-tint);
+}
+
+.form button {
+  margin-top: 1.5rem;
+  padding: 0.7rem 1rem;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.96rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.form button:hover {
+  background: var(--primary-dark);
+}
+
+/* Schedule */
+
+.day-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.day-heading .day-name {
+  font-weight: 700;
+}
+
+.day-heading .day-date {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* Things to Do Today */
+
+.today-card .card-header {
+  background: var(--primary-tint);
+}
+
+.today-card .card-header h2 {
+  color: var(--primary-dark);
+}
+
+/* Upcoming Exams */
+
+.exams-card .card-header {
+  background: var(--danger-tint);
+}
+
+.exams-card .card-header h2 {
+  color: var(--danger);
+}
+
+.exam-countdown {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--danger);
+  background: var(--danger-tint);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.duration-pill {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+/* Flash messages */
+
+.flashes {
+  list-style: none;
+  padding: 0.8rem 1.1rem;
+  margin: 0 0 1.5rem;
+  background: var(--danger-tint);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+/* Responsive */
+
+/* Narrow-screen overrides keep navigation and content usable on phones. */
+@media (max-width: 600px) {
+  .navbar-inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .container {
+    padding: 1.75rem 1.1rem 3rem;
+  }
+
+  .form-card {
+    padding: 1.25rem;
+  }
+}

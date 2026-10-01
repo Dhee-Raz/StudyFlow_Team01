@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ feature }} - StudyFlow{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1>{{ feature }}</h1>
+  </div>
+  <div class="empty-state">
+    <h2>Coming soon</h2>
+    <p>{{ feature }} will be available in a future update.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-primary" href="{{ url_for('index') }}">Back to Courses</a>
+  </div>
+{% endblock %}

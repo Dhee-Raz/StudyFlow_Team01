@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Courses - StudyFlow{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1>Your Courses</h1>
+    <p>Everything you're taking, and what's due in each.</p>
+  </div>
+  {% if not courses %}
+    <div class="empty-state">
+      <span class="icon">🎓</span>
+      No courses yet. <a href="{{ url_for('add_course') }}">Add your first course</a>.
+    </div>
+  {% else %}
+    <div class="course-stack">
+      {% for course in courses %}
+        <section class="card course-card">
+          <div class="card-header"><h2>{{ course.name }}</h2></div>
+          <div class="card-body">
+            {% if course.assignments %}
+              <ul class="assignment-list">
+                {% for assignment in course.assignments|sort(attribute='due_date') %}
+                  <li><strong>{{ assignment.title }}</strong>
+                    <span class="meta">Due {{ assignment.due_date.strftime("%a, %b %d %Y") }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="no-assignments">No assignments yet.</p>
+            {% endif %}
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  {% endif %}
+  <div class="actions">
+    <a class="btn btn-primary" href="{{ url_for('add_course') }}">+ Add Course</a>
+    <a class="btn btn-secondary" href="{{ url_for('add_assignment') }}">+ Add Assignment</a>
+    <a class="btn btn-secondary" href="{{ url_for('connect_canvas') }}">Connect Canvas</a>
+  </div>
+{% endblock %}

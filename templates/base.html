@@ -1,0 +1,57 @@
+{# Shared page shell: navigation, fonts/styles, flash messages, confirmation dialog, and JavaScript. Child pages fill the title and content blocks. request.endpoint selects the active navigation link. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}StudyFlow{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a class="brand" href="{{ url_for('index') }}">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="StudyFlow" class="brand-logo">
+      </a>
+      <nav class="nav-links">
+        <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}">Courses</a>
+        <a href="{{ url_for('add_course') }}" class="{{ 'active' if request.endpoint == 'add_course' }}">Add Course</a>
+        <a href="{{ url_for('add_assignment') }}" class="{{ 'active' if request.endpoint == 'add_assignment' }}">Add Assignment</a>
+        <a href="{{ url_for('schedule') }}" class="{{ 'active' if request.endpoint == 'schedule' }}">Schedule</a>
+        <a href="{{ url_for('connect_canvas') }}" class="{{ 'active' if request.endpoint == 'connect_canvas' }}">Connect Canvas</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for message in messages %}
+            <li>{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <div class="modal-overlay" id="confirm-modal" hidden>
+    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-modal-message">
+      <p id="confirm-modal-message">Are you sure?</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="confirm-modal-no">No</button>
+        <button type="button" class="btn btn-danger" id="confirm-modal-yes">Yes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

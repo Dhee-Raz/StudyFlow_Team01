@@ -1,0 +1,18 @@
+{# Course form. The input name="name" becomes request.form["name"] in app.add_course. POST submits to the same route; required provides browser validation. #}
+{% extends "base.html" %}
+{% block title %}Add Course - StudyFlow{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1>Add Course</h1>
+    <p>Give it a name so you can group assignments under it.</p>
+  </div>
+
+  <div class="form-card">
+    <form method="post" action="{{ url_for('add_course') }}" class="form">
+      <label for="name">Course name</label>
+      <input type="text" id="name" name="name" placeholder="e.g. CS 3398" required autofocus>
+
+      <button type="submit">Save Course</button>
+    </form>
+  </div>
+{% endblock %}
