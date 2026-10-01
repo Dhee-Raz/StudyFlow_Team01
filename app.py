@@ -40,6 +40,17 @@ def add_course():
     return render_template("add_course.html")
 
 
+@app.route("/delete-course/<int:course_id>", methods=["POST"])
+def delete_course(course_id):
+    course = db.get_or_404(Course, course_id)
+    # Remove dependents first to respect the required course foreign key.
+    for assignment in list(course.assignments):
+        db.session.delete(assignment)
+    db.session.delete(course)
+    db.session.commit()
+    return redirect(url_for("index"))
+
+
 @app.route("/add-assignment")
 def add_assignment():
     return render_template("coming_soon.html", feature="Add Assignment")
