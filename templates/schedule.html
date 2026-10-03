@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Study Schedule - StudyFlow{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <h1>Your Study Schedule</h1>
+    <p>Your daily study sessions, organized by date.</p>
+  </div>
+
+  {% if schedule %}
+    <div class="course-stack">
+      {% for session_date, sessions in schedule %}
+        <section class="card">
+          <div class="card-header">
+            <h2>{{ session_date.strftime("%A, %B %d, %Y") }}</h2>
+          </div>
+
+          <div class="card-body">
+            <ul class="assignment-list">
+              {% for session in sessions %}
+                <li>
+                  <strong>{{ session.assignment.title }}</strong>
+                  <span class="meta">
+                    {{ session.assignment.course.name }}
+                    · {{ "%.2f"|format(session.duration) }} hours
+                  </span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      No upcoming study sessions yet.
+      Sessions will appear here when you have assignments
+      with study hours and a current or future due date.
+    </div>
+  {% endif %}
+
+  <div class="actions">
+    <a class="btn btn-secondary" href="{{ url_for('index') }}">
+      Back to Courses
+    </a>
+  </div>
+{% endblock %}
