@@ -3,8 +3,8 @@ import os
 from flask import Flask, flash, redirect, render_template, request, url_for
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from models import db, Course
-
+from models import db, Course, Assignment
+from scheduler import generate_study_sessions
 
 @event.listens_for(Engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
@@ -58,7 +58,22 @@ def add_assignment():
 
 @app.route("/schedule")
 def schedule():
-    return render_template("coming_soon.html", feature="Schedule")
+    assignments = Assignment.query.all()
+    sessions_by_date = {}
+
+    for assignment in assignments:
+        sessions = generate_study_sessions(assignment)
+
+        for session in sessions:
+            session_date = session["date"]
+            sessions_by_date.setdefault(session_date, []).append(session)
+
+    sorted_schedule = sorted(sessions_by_date.items())
+
+    return render_template(
+        "schedule.html",
+        schedule=sorted_schedule,
+    )
 
 
 @app.route("/connect-canvas")
