@@ -85,3 +85,46 @@ def test_sessions_cover_available_days_and_split_fractional_hours(monkeypatch):
             date(2026, 10, 5),
         ]
         assert [session["duration"] for session in sessions] == [2.5, 2.5, 2.5]
+
+def test_seven_days_seven_hours_generates_seven_one_hour_sessions(monkeypatch):
+    class FrozenDateTime:
+        @classmethod
+        def now(cls, tz=None):
+            fixed_now = datetime(2026, 10, 3, 12)
+            return fixed_now.replace(tzinfo=timezone.utc) if tz else fixed_now
+
+    monkeypatch.setattr("scheduler.datetime", FrozenDateTime)
+    assignment = SimpleNamespace(
+        due_date=datetime(2026, 10, 10),
+        estimated_hours=7,
+    )
+
+    sessions = generate_study_sessions(assignment)
+
+    assert len(sessions) == 7
+    assert [session["date"] for session in sessions] == [
+        date(2026, 10, 3) + timedelta(days=day) for day in range(7)
+    ]
+    assert all(session["duration"] == 1 for session in sessions)
+    assert all(session["assignment"] is assignment for session in sessions)
+
+
+def test_due_tomorrow_generates_one_session(monkeypatch):
+    class FrozenDateTime:
+        @classmethod
+        def now(cls, tz=None):
+            fixed_now = datetime(2026, 10, 3, 12)
+            return fixed_now.replace(tzinfo=timezone.utc) if tz else fixed_now
+
+    monkeypatch.setattr("scheduler.datetime", FrozenDateTime)
+    assignment = SimpleNamespace(
+        due_date=datetime(2026, 10, 4),
+        estimated_hours=4,
+    )
+
+    sessions = generate_study_sessions(assignment)
+
+    assert len(sessions) == 1
+    assert sessions[0]["date"] == date(2026, 10, 3)
+    assert sessions[0]["duration"] == 4
+    assert sessions[0]["assignment"] is assignment
