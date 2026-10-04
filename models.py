@@ -36,3 +36,15 @@ class Assignment(db.Model):
         default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
+
+
+class PersonalTask(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    due_date = db.Column(db.DateTime, nullable=False)
+    details = db.Column(db.Text, nullable=False, default="")
+    created_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )

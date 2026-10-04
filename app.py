@@ -1,11 +1,12 @@
 """StudyFlow courses UI with previews for upcoming features."""
-from datetime import date, datetime
+import calendar as month_calendar
+from datetime import date, datetime, timedelta
 import math
 import os
 from flask import Flask, flash, redirect, render_template, request, url_for
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from models import db, Course, Assignment
+from models import db, Course, Assignment, PersonalTask
 from scheduler import generate_study_sessions
 
 @event.listens_for(Engine, "connect")
@@ -114,6 +115,215 @@ def add_assignment():
         return redirect(url_for("schedule"))
 
     return render_template("add_assignment.html", courses=courses, today=date.today().isoformat())
+
+
+def _calendar_redirect(year=None, month=None, selected=None):
+    today = date.today()
+    return redirect(
+        url_for(
+            "calendar_view",
+            year=year or today.year,
+            month=month or today.month,
+            selected=selected,
+        )
+    )
+
+
+def _parse_calendar_date(value):
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+@app.route("/calendar")
+def calendar_view():
+    today = date.today()
+    try:
+        year = int(request.args.get("year", today.year))
+        month = int(request.args.get("month", today.month))
+        if month < 1 or month > 12 or year < 2 or year > 9998:
+            raise ValueError
+    except (TypeError, ValueError, OverflowError):
+        year, month = today.year, today.month
+
+    weeks = month_calendar.Calendar(firstweekday=0).monthdatescalendar(year, month)
+    visible_days = {day for week in weeks for day in week}
+    calendar_days = {
+        day: {"events": [], "academic_count": 0, "personal_count": 0}
+        for day in visible_days
+    }
+
+    for assignment in Assignment.query.order_by(Assignment.due_date).all():
+        due_day = assignment.due_date.date()
+        if due_day in calendar_days:
+            day_events = calendar_days[due_day]
+            day_events["academic_count"] += 1
+            day_events["events"].append({
+                "key": f"assignment-{assignment.id}",
+                "title": assignment.title,
+                "kind": "academic",
+                "subtitle": assignment.course.name,
+            })
+
+    for task in PersonalTask.query.order_by(PersonalTask.due_date).all():
+        due_day = task.due_date.date()
+        if due_day in calendar_days:
+            day_events = calendar_days[due_day]
+            day_events["personal_count"] += 1
+            day_events["events"].append({
+                "key": f"personal-{task.id}",
+                "title": task.title,
+                "kind": "personal",
+                "subtitle": "Personal",
+            })
+
+    for day_events in calendar_days.values():
+        event_positions = {"academic": 0, "personal": 0}
+        for event in day_events["events"]:
+            event_positions[event["kind"]] += 1
+            event["position"] = event_positions[event["kind"]]
+
+    selected_key = request.args.get("selected", "")
+    selected_source, separator, selected_id = selected_key.rpartition("-")
+    selected_item = None
+    if separator and selected_source in {"assignment", "personal"}:
+        try:
+            selected_id = int(selected_id)
+            model = Assignment if selected_source == "assignment" else PersonalTask
+            selected_item = db.session.get(model, selected_id)
+        except ValueError:
+            selected_item = None
+    if selected_item is None:
+        selected_kind = None
+        selected_key = ""
+    else:
+        selected_kind = "academic" if selected_source == "assignment" else "personal"
+
+    first_day = date(year, month, 1)
+    previous_month = first_day - timedelta(days=1)
+    last_day = month_calendar.monthrange(year, month)[1]
+    next_month = date.fromordinal(date(year, month, last_day).toordinal() + 1)
+
+    return render_template(
+        "calendar.html",
+        year=year,
+        month=month,
+        month_label=first_day.strftime("%B %Y"),
+        weeks=weeks,
+        calendar_days=calendar_days,
+        today=today,
+        selected_key=selected_key,
+        selected_kind=selected_kind,
+        selected_item=selected_item,
+        previous_month=previous_month,
+        next_month=next_month,
+    )
+
+
+@app.route("/calendar/personal", methods=["POST"])
+def add_personal_task():
+    title = request.form.get("title", "").strip()
+    due_day = _parse_calendar_date(request.form.get("due_date"))
+    details = request.form.get("details", "").strip()
+    year = request.form.get("return_year", type=int)
+    month = request.form.get("return_month", type=int)
+
+    if not title or len(title) > 200:
+        flash("Enter a personal task title up to 200 characters.")
+        return _calendar_redirect(year, month)
+    if due_day is None:
+        flash("Enter a valid due date.")
+        return _calendar_redirect(year, month)
+    if len(details) > 1000:
+        flash("Details must be 1000 characters or fewer.")
+        return _calendar_redirect(year, month)
+
+    task = PersonalTask(
+        title=title,
+        due_date=datetime.combine(due_day, datetime.min.time()),
+        details=details,
+    )
+    db.session.add(task)
+    db.session.commit()
+    flash("Personal responsibility added to your calendar.")
+    return _calendar_redirect(due_day.year, due_day.month)
+
+
+@app.route("/calendar/personal/<int:task_id>/delete", methods=["POST"])
+def delete_personal_task(task_id):
+    task = db.get_or_404(PersonalTask, task_id)
+    year = request.form.get("return_year", type=int)
+    month = request.form.get("return_month", type=int)
+    db.session.delete(task)
+    db.session.commit()
+    flash("Personal responsibility deleted.")
+    return _calendar_redirect(year, month)
+
+
+@app.route("/calendar/personal/<int:task_id>", methods=["POST"])
+def update_personal_task(task_id):
+    task = db.get_or_404(PersonalTask, task_id)
+    title = request.form.get("title", "").strip()
+    due_day = _parse_calendar_date(request.form.get("due_date"))
+    details = request.form.get("details", "").strip()
+
+    if not title or len(title) > 200:
+        flash("Enter a personal task title up to 200 characters.")
+        return _calendar_redirect(selected=f"personal-{task.id}")
+    if due_day is None:
+        flash("Enter a valid due date.")
+        return _calendar_redirect(selected=f"personal-{task.id}")
+    if len(details) > 1000:
+        flash("Details must be 1000 characters or fewer.")
+        return _calendar_redirect(selected=f"personal-{task.id}")
+
+    task.title = title
+    task.due_date = datetime.combine(due_day, datetime.min.time())
+    task.details = details
+    db.session.commit()
+    flash("Personal responsibility updated.")
+    return _calendar_redirect(due_day.year, due_day.month, f"personal-{task.id}")
+
+
+@app.route("/calendar/assignment/<int:assignment_id>", methods=["POST"])
+def update_calendar_assignment(assignment_id):
+    assignment = db.get_or_404(Assignment, assignment_id)
+    title = request.form.get("title", "").strip()
+    due_day = _parse_calendar_date(request.form.get("due_date"))
+    estimated_hours_value = request.form.get("estimated_hours", "")
+    try:
+        estimated_hours = float(estimated_hours_value)
+    except ValueError:
+        estimated_hours = None
+
+    if not title or len(title) > 200:
+        flash("Enter an assignment title up to 200 characters.")
+        return _calendar_redirect(selected=f"assignment-{assignment.id}")
+    if due_day is None:
+        flash("Enter a valid due date.")
+        return _calendar_redirect(selected=f"assignment-{assignment.id}")
+    if estimated_hours is None or not math.isfinite(estimated_hours) or estimated_hours <= 0:
+        flash("Estimated study hours must be greater than zero.")
+        return _calendar_redirect(selected=f"assignment-{assignment.id}")
+
+    assignment.title = title
+    assignment.due_date = datetime.combine(due_day, datetime.min.time())
+    assignment.estimated_hours = estimated_hours
+    db.session.commit()
+    flash("Assignment updated.")
+    return _calendar_redirect(due_day.year, due_day.month, f"assignment-{assignment.id}")
+
+
+@app.route("/calendar/assignment/<int:assignment_id>/delete", methods=["POST"])
+def delete_calendar_assignment(assignment_id):
+    assignment = db.get_or_404(Assignment, assignment_id)
+    year = request.form.get("return_year", type=int)
+    month = request.form.get("return_month", type=int)
+    db.session.delete(assignment)
+    db.session.commit()
+    flash("Assignment deleted.")
+    return _calendar_redirect(year, month)
 
 
 @app.route("/schedule")

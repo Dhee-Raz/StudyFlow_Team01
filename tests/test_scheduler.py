@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from scheduler import generate_study_sessions
@@ -57,3 +57,31 @@ def test_due_today_still_generates_session():
 
     assert len(sessions) == 1
     assert sessions[0]["duration"] == 3
+
+
+def test_sessions_cover_available_days_and_split_fractional_hours(monkeypatch):
+    class FrozenDateTime:
+        @classmethod
+        def now(cls, tz=None):
+            fixed_now = datetime(2026, 10, 3, 12)
+            return fixed_now.replace(tzinfo=timezone.utc) if tz else fixed_now
+
+    monkeypatch.setattr("scheduler.datetime", FrozenDateTime)
+
+    for due_date in (
+        datetime(2026, 10, 6, 23, 59),
+        datetime(2026, 10, 6, 23, 59, tzinfo=timezone.utc),
+    ):
+        assignment = SimpleNamespace(
+            due_date=due_date,
+            estimated_hours=7.5,
+        )
+
+        sessions = generate_study_sessions(assignment)
+
+        assert [session["date"] for session in sessions] == [
+            date(2026, 10, 3),
+            date(2026, 10, 4),
+            date(2026, 10, 5),
+        ]
+        assert [session["duration"] for session in sessions] == [2.5, 2.5, 2.5]

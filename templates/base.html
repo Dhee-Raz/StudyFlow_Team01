@@ -22,13 +22,14 @@
         <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}">Courses</a>
         <a href="{{ url_for('add_course') }}" class="{{ 'active' if request.endpoint == 'add_course' }}">Add Course</a>
         <a href="{{ url_for('add_assignment') }}" class="{{ 'active' if request.endpoint == 'add_assignment' }}">Add Assignment</a>
+        <a href="{{ url_for('calendar_view') }}" class="{{ 'active' if request.endpoint == 'calendar_view' }}">Calendar</a>
         <a href="{{ url_for('schedule') }}" class="{{ 'active' if request.endpoint == 'schedule' }}">Schedule</a>
         <a href="{{ url_for('connect_canvas') }}" class="{{ 'active' if request.endpoint == 'connect_canvas' }}">Connect Canvas</a>
       </nav>
     </div>
   </header>
 
-  <main class="container">
+  <main class="container {{ 'container-calendar' if request.endpoint == 'calendar_view' }}">
     {% with messages = get_flashed_messages() %}
       {% if messages %}
         <ul class="flashes">
