@@ -22,11 +22,17 @@ A tool that generates a personalized study schedule using spaced repetition.
 4. Run the app:
    python app.py
 
-## Status
-Sprint 1 — Project skeleton with hello world route.
-
-## Courses UI
+## Features
 
 Run `python app.py` and open http://127.0.0.1:5001.
-The styled Courses page and Add Course form are available. Add Assignment,
-Schedule, and Connect Canvas currently display “Coming soon.”
+
+- Add courses and assignments with due dates and estimated study hours.
+- View academic deadlines and personal responsibilities in the monthly calendar.
+- Select and edit calendar items; date changes move items to their new day.
+- View generated study sessions on the Schedule page.
+- Connect Canvas is not available yet.
+
+## Tests
+
+Install the test dependencies with `pip install -r requirements-dev.txt`, then run
+`python -m pytest` from the repository root.
