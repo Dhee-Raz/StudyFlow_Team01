@@ -1,4 +1,6 @@
 """StudyFlow courses UI with previews for upcoming features."""
+from datetime import date, datetime
+import math
 import os
 from flask import Flask, flash, redirect, render_template, request, url_for
 from sqlalchemy import event
@@ -51,9 +53,67 @@ def delete_course(course_id):
     return redirect(url_for("index"))
 
 
-@app.route("/add-assignment")
+@app.route("/add-assignment", methods=["GET", "POST"])
 def add_assignment():
-    return render_template("coming_soon.html", feature="Add Assignment")
+    courses = Course.query.order_by(Course.name).all()
+    if not courses:
+        if request.method == "POST":
+            flash("Add a course before creating an assignment.")
+            return redirect(url_for("add_course"))
+        return render_template("add_assignment.html", courses=[], today=date.today().isoformat())
+
+    if request.method == "POST":
+        course_id = request.form.get("course_id", type=int)
+        course = db.session.get(Course, course_id) if course_id else None
+        title = request.form.get("title", "").strip()
+        due_date_value = request.form.get("due_date", "")
+        estimated_hours_value = request.form.get("estimated_hours", "")
+        errors = []
+
+        if course is None:
+            errors.append("Choose a course.")
+        if not title or len(title) > 200:
+            errors.append("Enter an assignment title up to 200 characters.")
+
+        try:
+            due_date = datetime.strptime(due_date_value, "%Y-%m-%d")
+            if due_date.date() < date.today():
+                errors.append("Choose a due date that is today or later.")
+        except ValueError:
+            due_date = None
+            errors.append("Enter a valid due date.")
+
+        try:
+            estimated_hours = float(estimated_hours_value)
+            if not math.isfinite(estimated_hours) or estimated_hours <= 0:
+                errors.append("Estimated study hours must be greater than zero.")
+        except ValueError:
+            estimated_hours = None
+            errors.append("Enter a valid number of estimated study hours.")
+
+        if errors:
+            for error in errors:
+                flash(error)
+            return render_template(
+                "add_assignment.html",
+                courses=courses,
+                today=date.today().isoformat(),
+                selected_course_id=course_id,
+            ), 400
+
+        db.session.add(
+            Assignment(
+                course=course,
+                title=title,
+                due_date=due_date,
+                estimated_hours=estimated_hours,
+            )
+        )
+        db.session.commit()
+        flash("Assignment added. Your study schedule is ready.")
+        return redirect(url_for("schedule"))
+
+    return render_template("add_assignment.html", courses=courses, today=date.today().isoformat())
 
 
 @app.route("/schedule")

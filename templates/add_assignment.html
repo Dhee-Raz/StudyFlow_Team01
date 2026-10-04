@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Add Assignment - StudyFlow{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1>Add Assignment</h1>
+    <p>Set a deadline and study estimate to build your schedule.</p>
+  </div>
+
+  {% if not courses %}
+    <div class="empty-state">
+      <span class="icon" aria-hidden="true">📚</span>
+      <p>Add a course before creating an assignment.</p>
+      <a class="btn btn-primary" href="{{ url_for('add_course') }}">Add a course</a>
+    </div>
+  {% else %}
+    <div class="form-card">
+      <form method="post" action="{{ url_for('add_assignment') }}" class="form">
+        <label for="course_id">Course</label>
+        <select id="course_id" name="course_id" required autofocus>
+          <option value="" disabled {{ 'selected' if not selected_course_id }}>Choose a course</option>
+          {% for course in courses %}
+            <option value="{{ course.id }}" {{ 'selected' if selected_course_id == course.id }}>{{ course.name }}</option>
+          {% endfor %}
+        </select>
+
+        <label for="title">Assignment title</label>
+        <input type="text" id="title" name="title" maxlength="200" value="{{ request.form.get('title', '') }}" placeholder="e.g. Research paper" required>
+
+        <label for="due_date">Due date</label>
+        <input type="date" id="due_date" name="due_date" min="{{ today }}" value="{{ request.form.get('due_date', '') }}" required>
+
+        <label for="estimated_hours">Estimated study hours</label>
+        <input type="number" id="estimated_hours" name="estimated_hours" min="0.01" step="any" value="{{ request.form.get('estimated_hours', '') }}" placeholder="e.g. 4" required>
+
+        <button type="submit">Create Assignment</button>
+      </form>
+    </div>
+  {% endif %}
+{% endblock %}
