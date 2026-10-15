@@ -59,3 +59,55 @@ suitable for a 30-second sprint demonstration.
 `tests/test_integration.py` verifies the forms, SQLite persistence, scheduler,
 and rendered schedule together using one HTTP client and an isolated temporary
 database. It also checks invalid submissions and the no-course guidance.
+
+
+## Sprint 2 Ticket 1 — account database foundation
+
+The new `User` model stores an ID, normalized unique email address, password hash
+and creation timestamp. Courses and personal tasks have required `user_id`
+foreign keys; assignments continue to belong to a user through their course.
+
+**Important:** This ticket implements the data layer only. Registration/login,
+per-user access control, and updating UI routes to select the signed-in owner
+are Tickets 2 and 3. Until those tickets are integrated, the pre-authentication
+course/task creation routes cannot insert into the new non-nullable owner
+columns. Do not deploy this branch as a complete multi-user application.
+
+### Existing SQLite databases: migrate before using the new code
+
+1. Stop Flask. Keep your existing database safe; never delete `instance/`.
+2. Install the requirements in your Python virtual environment.
+3. Select the **specific account** that should own legacy course and task data.
+   Run from the repository root, using the actual database file path:
+
+   ```bash
+   python scripts/migrate_users.py --database instance/studyflow.db --legacy-email student@example.edu
+   ```
+
+4. At the prompts, enter and confirm a password. It is never written to shell
+   history or stored in plaintext; only a salted password hash is stored.
+5. Verify the command reports success and a
+   `studyflow.db.pre-users-<timestamp>.bak` backup. The migration preserves
+   course, assignment and personal-task records (including original IDs).
+6. On a fresh database, no migration is required; SQLAlchemy creates the
+   new tables using the updated models.
+
+This migration intentionally refuses ambiguous or unexpected schemas, repeated
+migrations, orphaned assignments, and databases with custom course/task
+indexes or triggers. Resolve those cases manually rather than risk data loss.
+It uses SQLite's backup API and a transactional table rebuild; do not run it
+concurrently with a live application. Existing database files and backups
+must stay out of Git.
+
+### Ticket 1 verification
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q tests/test_user_migration.py
+python -m pytest -q
+```
+
+The first test verifies record preservation, password hashes, the ownership
+foreign keys, a usable backup and rejection of a second migration. The other
+Sprint 1 tests must continue to pass after later tickets update their fixture
+setup for authenticated users.
