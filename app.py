@@ -8,6 +8,7 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from models import db, Course, Assignment, PersonalTask
 from scheduler import generate_study_sessions
+from canvas_connection import register_canvas
 
 @event.listens_for(Engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
@@ -346,9 +347,10 @@ def schedule():
     )
 
 
-@app.route("/connect-canvas")
-def connect_canvas():
-    return render_template("coming_soon.html", feature="Connect Canvas")
+app.config["CANVAS_ALLOWED_HOSTS"] = tuple(
+    host.strip().lower() for host in os.environ.get("STUDYFLOW_CANVAS_ALLOWED_HOSTS", "").split(",") if host.strip()
+)
+register_canvas(app)
 
 
 if __name__ == "__main__":

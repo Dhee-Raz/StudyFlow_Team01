@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Connect Canvas - StudyFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Connect Canvas</h1>
+  <p>Verify your Canvas account using a personal access token.</p>
+</div>
+{% if error %}<p class="flashes" role="alert">{{ error }}</p>{% endif %}
+{% if connection %}
+<section class="card">
+  <div class="card-body">
+    <h2>Connected as {{ connection.name }}</h2>
+    <p>{{ connection.url }}</p>
+    <p>Connection verified. Importing courses and assignments is coming next.</p>
+    <form method="post" action="{{ url_for('disconnect_canvas') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn btn-danger" type="submit">Disconnect Canvas</button>
+    </form>
+  </div>
+</section>
+{% else %}
+<div class="form-card">
+  <form method="post" class="form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="canvas_url">Canvas school URL</label>
+    <input id="canvas_url" name="canvas_url" type="url" placeholder="https://school.instructure.com" required maxlength="255">
+    <label for="access_token">Personal access token</label>
+    <input id="access_token" name="access_token" type="password" autocomplete="off" required maxlength="4096" aria-describedby="token-help">
+    <p id="token-help">Your token is kept on the server for this browser session for up to one hour. Restarting StudyFlow clears the connection.</p>
+    <button type="submit">Verify and Connect</button>
+  </form>
+</div>
+{% endif %}
+<section class="card">
+  <div class="card-body">
+    <h2>Get your personal access token</h2>
+    <ol>
+      <li>Open your school’s Canvas website and sign in.</li>
+      <li>Go to Account → Settings → Approved Integrations.</li>
+      <li>Select New Access Token, enter “StudyFlow” as its purpose, and choose an expiration date.</li>
+      <li>Generate the token and paste it here. Never share it in chat or commit it to GitHub.</li>
+    </ol>
+    <p>If your school disables personal tokens, contact its Canvas administrator.</p>
+    <p>Disconnecting removes the token from StudyFlow. To revoke it in Canvas too, remove it under Approved Integrations.</p>
+  </div>
+</section>
+{% endblock %}
