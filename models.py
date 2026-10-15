@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import validates
 
 db = SQLAlchemy()
 
@@ -13,6 +14,15 @@ class User(db.Model):
     )
     courses = db.relationship("Course", backref="owner", lazy=True)
     personal_tasks = db.relationship("PersonalTask", backref="owner", lazy=True)
+
+    @validates("email")
+    def normalize_email(self, key, value):
+        if not isinstance(value, str):
+            raise ValueError("Email must be a string.")
+        normalized = value.strip().lower()
+        if not normalized or len(normalized) > 255 or "@" not in normalized:
+            raise ValueError("Provide a valid email address.")
+        return normalized
 
 
 class Course(db.Model):
