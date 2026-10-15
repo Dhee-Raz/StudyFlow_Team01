@@ -59,3 +59,36 @@ suitable for a 30-second sprint demonstration.
 `tests/test_integration.py` verifies the forms, SQLite persistence, scheduler,
 and rendered schedule together using one HTTP client and an isolated temporary
 database. It also checks invalid submissions and the no-course guidance.
+
+## Ticket 9 — Connect Canvas
+
+Open **Connect Canvas**, enter your school’s HTTPS Canvas URL and personal access
+token, and select **Verify and Connect**. Create a token in Canvas under
+**Account → Settings → Approved Integrations → New Access Token**. School policy
+may disable personal tokens. Use a short expiration and never share the token.
+
+This ticket only verifies `GET /api/v1/users/self/profile`; it does not import or
+modify courses, assignments, or schedules. API reference:
+https://developerdocs.instructure.com/services/canvas/resources/users
+
+Security and current scope:
+
+- Tokens stay in server memory, isolated by an opaque browser-session identifier.
+  They are not placed in cookies, the database, rendered pages, or application logs.
+- Connections expire after one hour (expired entries are pruned on the next store
+  access), on server restart, or immediately when disconnected. Closing a browser
+  does not immediately remove the server entry. Disconnect also leaves planner data
+  untouched; revoke the token in Canvas separately if needed.
+- Failed reconnects leave a previously verified connection intact.
+- Hosted `*.instructure.com` school URLs are supported. For a trusted custom Canvas
+  domain, the administrator can set `STUDYFLOW_CANVAS_ALLOWED_HOSTS` to a comma-separated
+  list of exact hostnames. Only configure real Canvas hosts; never internal services.
+- Requests use HTTPS, a timeout, and no redirects. Connection/disconnection forms
+  check CSRF tokens; connection responses use `Cache-Control: no-store`.
+- Current `main` has no account authentication. This is a single-process development
+  implementation, not persistent per-user credential storage. Before multi-worker
+  or multi-user deployment, integrate the team's login system and an encrypted,
+  shared credential store. Set a private `STUDYFLOW_SECRET_KEY` and serve over HTTPS.
+
+Install with `pip install -r requirements-dev.txt` and run `python -m pytest -q`.
+Canvas tests mock the API; they need no personal token and make no live requests.
