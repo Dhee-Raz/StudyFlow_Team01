@@ -9,6 +9,7 @@ from sqlalchemy.engine import Engine
 from models import db, Course, Assignment, PersonalTask
 from scheduler import generate_study_sessions
 from canvas_connection import register_canvas
+from migrations import upgrade_canvas_import
 
 @event.listens_for(Engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
@@ -24,6 +25,7 @@ app.config["SECRET_KEY"] = os.environ.get("STUDYFLOW_SECRET_KEY", "dev-secret-ke
 db.init_app(app)
 with app.app_context():
     db.create_all()
+    upgrade_canvas_import(db.engine)
 
 
 @app.route("/")
@@ -156,6 +158,8 @@ def calendar_view():
     }
 
     for assignment in Assignment.query.order_by(Assignment.due_date).all():
+        if assignment.due_date is None:
+            continue
         due_day = assignment.due_date.date()
         if due_day in calendar_days:
             day_events = calendar_days[due_day]
@@ -309,7 +313,9 @@ def update_calendar_assignment(assignment_id):
         return _calendar_redirect(selected=f"assignment-{assignment.id}")
 
     assignment.title = title
-    assignment.due_date = datetime.combine(due_day, datetime.min.time())
+    # Updating only study hours must preserve the imported deadline's time.
+    if assignment.due_date is None or assignment.due_date.date() != due_day:
+        assignment.due_date = datetime.combine(due_day, datetime.min.time())
     assignment.estimated_hours = estimated_hours
     db.session.commit()
     flash("Assignment updated.")

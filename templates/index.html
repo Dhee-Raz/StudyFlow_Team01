@@ -23,9 +23,23 @@
           <div class="card-body">
             {% if course.assignments %}
               <ul class="assignment-list">
-                {% for assignment in course.assignments|sort(attribute='due_date') %}
+                {% set dated = course.assignments|selectattr('due_date')|sort(attribute='due_date')|list %}
+                {% set undated = course.assignments|rejectattr('due_date')|list %}
+                {% for assignment in dated + undated %}
                   <li><strong>{{ assignment.title }}</strong>
-                    <span class="meta">Due {{ assignment.due_date.strftime("%a, %b %d %Y") }}</span>
+                    {% if assignment.canvas_url %}
+                      <a href="{{ assignment.canvas_url }}" target="_blank" rel="noopener noreferrer">Open in Canvas</a>
+                    {% endif %}
+                    {% if assignment.due_date %}
+                      <span class="meta">Due {{ assignment.due_date.strftime("%a, %b %d %Y") }}{% if assignment.canvas_timezone %} at {{ assignment.due_date.strftime("%H:%M") }} ({{ assignment.canvas_timezone }}){% endif %}</span>
+                    {% else %}
+                      <span class="meta">No deadline — needs review</span>
+                    {% endif %}
+                    {% if assignment.points_possible is not none %}<span class="meta">{{ assignment.points_possible }} points</span>{% endif %}
+                    {% if assignment.canvas_key and assignment.estimated_hours <= 0 %}
+                      <span class="meta">Study hours needed before scheduling</span>
+                    {% endif %}
+                    {% if assignment.canvas_key %}<a href="{{ url_for('calendar_view', selected='assignment-' ~ assignment.id) }}">Review deadline and study hours</a>{% endif %}
                   </li>
                 {% endfor %}
               </ul>

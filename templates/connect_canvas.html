@@ -11,7 +11,12 @@
   <div class="card-body">
     <h2>Connected as {{ connection.name }}</h2>
     <p>{{ connection.url }}</p>
-    <p>Connection verified. Importing courses and assignments is coming next.</p>
+    <p>Import your active student courses and their assignments. Existing imported items will be skipped.</p>
+    <form method="post" action="{{ url_for('import_canvas') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn btn-primary" type="submit">Import Courses and Assignments</button>
+    </form>
+    <p>Study hours start at zero. Add an estimate in Calendar before scheduling. Missing deadlines are marked for review.</p>
     <form method="post" action="{{ url_for('disconnect_canvas') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button class="btn btn-danger" type="submit">Disconnect Canvas</button>

@@ -92,3 +92,55 @@ Security and current scope:
 
 Install with `pip install -r requirements-dev.txt` and run `python -m pytest -q`.
 Canvas tests mock the API; they need no personal token and make no live requests.
+
+## Ticket 10 — Import Canvas courses and assignments
+
+After connecting, choose **Import Courses and Assignments**. StudyFlow fetches your
+active student courses and their assignments, including paginated results, then saves
+them to the existing Courses view. The import summary reports courses/assignments
+added, skipped items, invalid items, and assignments needing a deadline.
+
+- Titles, available deadlines, points, and safe Canvas assignment links are imported.
+- Canvas profile timezone is used for deadline display (UTC if absent or invalid).
+  No deadline is stored as `NULL`, clearly marked for review, and excluded from calendar
+  dates and scheduling until a date is provided.
+- Estimated study hours start at **0**; importing never requires manual course or
+  assignment entry. Use **Review deadline and study hours** to enter an estimate in
+  Calendar. Scheduling starts only after a deadline and positive estimate exist.
+- Duplicate keys include Canvas host, Canvas account ID, course ID, and assignment ID.
+  Reimporting skips existing records and preserves their local edits and hours.
+  Refreshing changed deadlines and syncing are **Ticket 11**, not implemented here.
+- All API pages are fetched before saving. HTTP/parse/pagination failures save nothing;
+  a database save failure rolls back the whole import. Malformed individual items are
+  counted as failed while valid items can be imported. Individual fields longer than
+  the existing model limits are truncated to 100 characters for courses and 200 for titles.
+- Redirects and pagination links outside the original HTTPS endpoint are rejected;
+  network requests are bounded by timeouts and a 100-page limit per endpoint.
+- Existing database tables are upgraded automatically at startup with an atomic,
+  repeatable SQLite migration. It adds import metadata/unique indexes and allows
+  missing assignment deadlines while preserving records and indexes. **Back up your
+  SQLite database before upgrading.** No personal databases or tokens are committed.
+- This remains a **single-user local planner**. Imported IDs are separated by Canvas
+  account to avoid collisions, but the planner has no login/access-control layer and
+  its course listing is shared. Do not deploy it as a shared multi-user service until
+  the team's authentication/ownership work is integrated. Ticket 9's connection
+  lifetime and single-process restrictions still apply.
+
+### Try this branch
+
+```bash
+git fetch origin
+git switch --track origin/feature/ticket-10-canvas-import
+pip install -r requirements-dev.txt
+python -m pytest -q
+python app.py
+```
+
+Open http://127.0.0.1:5001/connect-canvas, verify your token, and import. Inspect Courses,
+open an assignment in Canvas, then use its review link to add hours. Repeat the import
+and verify no duplicates are added. Disconnecting does not delete imported records.
+
+API references: [courses](https://developerdocs.instructure.com/services/canvas/resources/courses),
+[assignments](https://developerdocs.instructure.com/services/canvas/resources/assignments),
+[pagination](https://developerdocs.instructure.com/services/canvas/basics/file.pagination).
+Automated tests use fake HTTP responses; a real school-token smoke test is still needed.

@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 class Course(db.Model):
+    canvas_key = db.Column(db.String(600), nullable=True)
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     created_at = db.Column(
@@ -19,6 +20,10 @@ class Course(db.Model):
 
 
 class Assignment(db.Model):
+    canvas_key = db.Column(db.String(650), nullable=True)
+    canvas_url = db.Column(db.String(600), nullable=True)
+    canvas_timezone = db.Column(db.String(100), nullable=True)
+    points_possible = db.Column(db.Float, nullable=True)
     id = db.Column(db.Integer, primary_key=True)
 
     course_id = db.Column(
@@ -28,7 +33,7 @@ class Assignment(db.Model):
     )
 
     title = db.Column(db.String(200), nullable=False)
-    due_date = db.Column(db.DateTime, nullable=False)
+    due_date = db.Column(db.DateTime, nullable=True)
     estimated_hours = db.Column(db.Float, nullable=False)
 
     created_at = db.Column(

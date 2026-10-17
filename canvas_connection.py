@@ -54,7 +54,7 @@ def verify_canvas(base_url, token):
         profile = response.json()
         if not isinstance(profile, dict) or not profile.get('id') or not isinstance(profile.get('name'), str):
             raise CanvasConnectionError('Canvas returned an unexpected response. Check the school address.')
-        return {'id': profile['id'], 'name': profile['name']}
+        return {'id': profile['id'], 'name': profile['name'], 'time_zone': profile.get('time_zone')}
     except (requests.RequestException, ValueError) as error:
         if isinstance(error, CanvasConnectionError):
             raise
@@ -120,7 +120,7 @@ def register_canvas(app):
             return page(str(error), 400)
         session['canvas_connection'] = store.save(session.get('canvas_connection'), base_url, token, profile)
         session['canvas_csrf'] = secrets.token_urlsafe(32)
-        flash('Canvas connection verified. Course and assignment import is coming next.')
+        flash('Canvas connection verified. You can now import your courses and assignments.')
         return redirect(url_for('connect_canvas'))
 
     @app.route('/disconnect-canvas', methods=['POST'])
@@ -132,9 +132,28 @@ def register_canvas(app):
         flash('Disconnected from Canvas. Your planner data has not changed.')
         return redirect(url_for('connect_canvas'))
 
+    @app.route('/import-canvas', methods=['POST'])
+    def import_canvas():
+        from canvas_import import CanvasImportError, import_courses
+        if not csrf_valid():
+            return page('Your form expired. Reload this page and try again.', 400)
+        record = store.get(session.get('canvas_connection'))
+        if not record:
+            return page('Connect to Canvas before importing. Your previous connection may have expired.', 400)
+        try:
+            counts = import_courses(record)
+        except CanvasImportError as error:
+            return page(str(error), 400)
+        flash(f"Import complete: {counts['courses']} courses added, "
+              f"{counts['assignments']} assignments added, {counts['skipped']} items skipped, "
+              f"{counts['failed']} invalid items failed. "
+              f"{counts['missing_deadlines']} new assignments need a deadline. "
+              "Add study hours before scheduling imported assignments.")
+        return redirect(url_for('index'))
+
     @app.after_request
     def protect_canvas_response(response):
-        if request.endpoint in ('connect_canvas', 'disconnect_canvas'):
+        if request.endpoint in ('connect_canvas', 'disconnect_canvas', 'import_canvas'):
             response.headers['Cache-Control'] = 'no-store'
             response.headers['Referrer-Policy'] = 'no-referrer'
         return response
