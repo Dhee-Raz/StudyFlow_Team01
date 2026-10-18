@@ -9,6 +9,7 @@
 
   <div class="form-card">
     <form method="post" action="{{ url_for('add_course') }}" class="form">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <label for="name">Course name</label>
       <input type="text" id="name" name="name" placeholder="e.g. CS 3398" required autofocus>
 

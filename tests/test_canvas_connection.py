@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 import requests
-from flask import Flask
+from flask import Flask, Blueprint
 
 from canvas_connection import register_canvas
 
@@ -15,6 +15,12 @@ def site(monkeypatch):
     app.config.update(TESTING=True, SECRET_KEY='test-secret')
     for endpoint in ('index', 'add_course', 'add_assignment', 'calendar_view', 'schedule'):
         app.add_url_rule('/' + endpoint, endpoint, lambda: '')
+    auth = Blueprint('auth', __name__)
+    auth.add_url_rule('/login', endpoint='login', view_func=lambda: '')
+    auth.add_url_rule('/register', endpoint='register', view_func=lambda: '')
+    auth.add_url_rule('/logout', endpoint='logout', view_func=lambda: '')
+    app.register_blueprint(auth)
+    app.context_processor(lambda: {'form_csrf_token': lambda: 'standalone-test-token'})
     register_canvas(app)
     response = Mock(status_code=200)
     response.json.return_value = {'id': 42, 'name': 'Test Student'}

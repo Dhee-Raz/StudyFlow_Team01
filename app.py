@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 import math
 import os
 from flask import Flask, flash, redirect, render_template, request, url_for
+from auth import auth, current_user, login_required
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from models import db, Course, Assignment, PersonalTask
@@ -22,31 +23,35 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("STUDYFLOW_DATABASE_URI",
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = os.environ.get("STUDYFLOW_SECRET_KEY", "dev-secret-key")
 db.init_app(app)
+app.register_blueprint(auth)
 with app.app_context():
     db.create_all()
 
 
 @app.route("/")
+@login_required
 def index():
-    return render_template("index.html", courses=Course.query.order_by(Course.name).all())
+    return render_template("index.html", courses=Course.query.filter_by(user_id=current_user().id).order_by(Course.name).all())
 
 
 @app.route("/add-course", methods=["GET", "POST"])
+@login_required
 def add_course():
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         if not name or len(name) > 100:
             flash("Enter a course name between 1 and 100 characters.")
             return render_template("add_course.html"), 400
-        db.session.add(Course(name=name))
+        db.session.add(Course(name=name, user_id=current_user().id))
         db.session.commit()
         return redirect(url_for("index"))
     return render_template("add_course.html")
 
 
 @app.route("/delete-course/<int:course_id>", methods=["POST"])
+@login_required
 def delete_course(course_id):
-    course = db.get_or_404(Course, course_id)
+    course = Course.query.filter_by(id=course_id, user_id=current_user().id).first_or_404()
     # Remove dependents first to respect the required course foreign key.
     for assignment in list(course.assignments):
         db.session.delete(assignment)
@@ -56,8 +61,9 @@ def delete_course(course_id):
 
 
 @app.route("/add-assignment", methods=["GET", "POST"])
+@login_required
 def add_assignment():
-    courses = Course.query.order_by(Course.name).all()
+    courses = Course.query.filter_by(user_id=current_user().id).order_by(Course.name).all()
     if not courses:
         if request.method == "POST":
             flash("Add a course before creating an assignment.")
@@ -66,7 +72,7 @@ def add_assignment():
 
     if request.method == "POST":
         course_id = request.form.get("course_id", type=int)
-        course = db.session.get(Course, course_id) if course_id else None
+        course = Course.query.filter_by(id=course_id, user_id=current_user().id).first() if course_id else None
         title = request.form.get("title", "").strip()
         due_date_value = request.form.get("due_date", "")
         estimated_hours_value = request.form.get("estimated_hours", "")
@@ -138,6 +144,7 @@ def _parse_calendar_date(value):
 
 
 @app.route("/calendar")
+@login_required
 def calendar_view():
     today = date.today()
     try:
@@ -155,7 +162,7 @@ def calendar_view():
         for day in visible_days
     }
 
-    for assignment in Assignment.query.order_by(Assignment.due_date).all():
+    for assignment in Assignment.query.join(Course).filter(Course.user_id == current_user().id).order_by(Assignment.due_date).all():
         due_day = assignment.due_date.date()
         if due_day in calendar_days:
             day_events = calendar_days[due_day]
@@ -167,7 +174,7 @@ def calendar_view():
                 "subtitle": assignment.course.name,
             })
 
-    for task in PersonalTask.query.order_by(PersonalTask.due_date).all():
+    for task in PersonalTask.query.filter_by(user_id=current_user().id).order_by(PersonalTask.due_date).all():
         due_day = task.due_date.date()
         if due_day in calendar_days:
             day_events = calendar_days[due_day]
@@ -192,7 +199,7 @@ def calendar_view():
         try:
             selected_id = int(selected_id)
             model = Assignment if selected_source == "assignment" else PersonalTask
-            selected_item = db.session.get(model, selected_id)
+            selected_item = (Assignment.query.join(Course).filter(Assignment.id == selected_id, Course.user_id == current_user().id).first() if selected_source == "assignment" else PersonalTask.query.filter_by(id=selected_id, user_id=current_user().id).first())
         except ValueError:
             selected_item = None
     if selected_item is None:
@@ -223,6 +230,7 @@ def calendar_view():
 
 
 @app.route("/calendar/personal", methods=["POST"])
+@login_required
 def add_personal_task():
     title = request.form.get("title", "").strip()
     due_day = _parse_calendar_date(request.form.get("due_date"))
@@ -244,6 +252,7 @@ def add_personal_task():
         title=title,
         due_date=datetime.combine(due_day, datetime.min.time()),
         details=details,
+        user_id=current_user().id,
     )
     db.session.add(task)
     db.session.commit()
@@ -252,8 +261,9 @@ def add_personal_task():
 
 
 @app.route("/calendar/personal/<int:task_id>/delete", methods=["POST"])
+@login_required
 def delete_personal_task(task_id):
-    task = db.get_or_404(PersonalTask, task_id)
+    task = PersonalTask.query.filter_by(id=task_id, user_id=current_user().id).first_or_404()
     year = request.form.get("return_year", type=int)
     month = request.form.get("return_month", type=int)
     db.session.delete(task)
@@ -263,6 +273,7 @@ def delete_personal_task(task_id):
 
 
 @app.route("/calendar/personal/<int:task_id>", methods=["POST"])
+@login_required
 def update_personal_task(task_id):
     task = db.get_or_404(PersonalTask, task_id)
     title = request.form.get("title", "").strip()
@@ -288,8 +299,9 @@ def update_personal_task(task_id):
 
 
 @app.route("/calendar/assignment/<int:assignment_id>", methods=["POST"])
+@login_required
 def update_calendar_assignment(assignment_id):
-    assignment = db.get_or_404(Assignment, assignment_id)
+    assignment = Assignment.query.join(Course).filter(Assignment.id == assignment_id, Course.user_id == current_user().id).first_or_404()
     title = request.form.get("title", "").strip()
     due_day = _parse_calendar_date(request.form.get("due_date"))
     estimated_hours_value = request.form.get("estimated_hours", "")
@@ -317,6 +329,7 @@ def update_calendar_assignment(assignment_id):
 
 
 @app.route("/calendar/assignment/<int:assignment_id>/delete", methods=["POST"])
+@login_required
 def delete_calendar_assignment(assignment_id):
     assignment = db.get_or_404(Assignment, assignment_id)
     year = request.form.get("return_year", type=int)
@@ -328,8 +341,9 @@ def delete_calendar_assignment(assignment_id):
 
 
 @app.route("/schedule")
+@login_required
 def schedule():
-    assignments = Assignment.query.all()
+    assignments = Assignment.query.join(Course).filter(Course.user_id == current_user().id).all()
     sessions_by_date = {}
 
     for assignment in assignments:
@@ -351,6 +365,11 @@ app.config["CANVAS_ALLOWED_HOSTS"] = tuple(
     host.strip().lower() for host in os.environ.get("STUDYFLOW_CANVAS_ALLOWED_HOSTS", "").split(",") if host.strip()
 )
 register_canvas(app)
+
+@app.before_request
+def protect_canvas_pages():
+    if request.endpoint in {"connect_canvas", "disconnect_canvas"} and current_user() is None:
+        return redirect(url_for("auth.login"))
 
 
 if __name__ == "__main__":
