@@ -1,0 +1,25 @@
+name: Sprint 2 Ticket 2 authentication tests
+on:
+  push:
+    branches: [sprint2-ticket2-authentication]
+  pull_request:
+    paths:
+      - 'app.py'
+      - 'auth.py'
+      - 'models.py'
+      - 'templates/**'
+      - 'tests/**'
+      - '.github/workflows/ticket2-auth.yml'
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest -q tests/test_authentication.py
+      - run: python -m pytest -q tests/test_integration.py
+      - run: python -m pytest -q tests/test_scheduler.py tests/test_user_migration.py
+      - run: python -m compileall -q app.py auth.py models.py
