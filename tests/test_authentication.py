@@ -77,26 +77,26 @@ def test_csrf_rejects_missing_tokens(planner):
 
 
 def test_user_isolation_for_planner_records(planner):
-    with planner.app.test_client() as alice:
-        bob = planner.app.test_client()
-        register(alice, "alice@example.edu")
-        assert submit(alice, "/add-course", {"name": "Alice only"}).status_code == 302
-        with planner.app.app_context():
-            course = planner.Course.query.one()
-            alice_course_id = course.id
+    alice = planner.app.test_client()
+    bob = planner.app.test_client()
+    register(alice, "alice@example.edu")
+    assert submit(alice, "/add-course", {"name": "Alice only"}).status_code == 302
+    with planner.app.app_context():
+        course = planner.Course.query.one()
+        alice_course_id = course.id
 
-        register(bob, "bob@example.edu")
-        assert b"Alice only" not in bob.get("/").data
-        assert submit(bob, "/delete-course/" + str(alice_course_id)).status_code == 404
-        assert submit(bob, "/add-assignment", {
-            "course_id": str(alice_course_id), "title": "Illegal",
-            "due_date": "2099-01-01", "estimated_hours": "2"
-        }).status_code == 302  # Redirects to add-course when no owned course exists.
-        assert submit(bob, "/add-course", {"name": "Bob only"}).status_code == 302
-        response = submit(bob, "/add-assignment", {
-            "course_id": str(alice_course_id), "title": "Illegal",
-            "due_date": "2099-01-01", "estimated_hours": "2"
-        })
-        assert response.status_code == 400
-        assert b"Alice only" in alice.get("/").data
-        assert b"Bob only" not in alice.get("/").data
+    register(bob, "bob@example.edu")
+    assert b"Alice only" not in bob.get("/").data
+    assert submit(bob, "/delete-course/" + str(alice_course_id)).status_code == 404
+    assert submit(bob, "/add-assignment", {
+        "course_id": str(alice_course_id), "title": "Illegal",
+        "due_date": "2099-01-01", "estimated_hours": "2"
+    }).status_code == 302  # Redirects to add-course when no owned course exists.
+    assert submit(bob, "/add-course", {"name": "Bob only"}).status_code == 302
+    response = submit(bob, "/add-assignment", {
+        "course_id": str(alice_course_id), "title": "Illegal",
+        "due_date": "2099-01-01", "estimated_hours": "2"
+    })
+    assert response.status_code == 400
+    assert b"Alice only" in alice.get("/").data
+    assert b"Bob only" not in alice.get("/").data
