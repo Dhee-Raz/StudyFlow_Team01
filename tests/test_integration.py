@@ -39,9 +39,23 @@ def client(planner, monkeypatch):
         planner.db.drop_all()
         planner.db.create_all()
     with planner.app.test_client() as browser:
+        browser.get("/register")
+        with browser.session_transaction() as state:
+            csrf = state["_csrf_token"]
+        registered = browser.post("/register", data={
+            "_csrf_token": csrf, "email": "sprint1@example.edu",
+            "password": "test-password-1234", "confirm_password": "test-password-1234"
+        })
+        assert registered.status_code == 302
         yield browser
     with planner.app.app_context():
         planner.db.session.remove()
+
+
+def post(client, path, data=None, **kwargs):
+    with client.session_transaction() as state:
+        token = state["_csrf_token"]
+    return client.post(path, data={"_csrf_token": token, **(data or {})}, **kwargs)
 
 
 def test_course_form_to_database_to_generated_schedule(client, planner):
@@ -102,7 +116,7 @@ def test_course_form_to_database_to_generated_schedule(client, planner):
 
 
 def test_invalid_assignment_does_not_create_sessions(client, planner):
-    client.post("/add-course", data={"name": "CS 3398"})
+    post(client,"/add-course", data={"name": "CS 3398"})
     with planner.app.app_context():
         course_id = planner.Course.query.one().id
     response = client.post(
