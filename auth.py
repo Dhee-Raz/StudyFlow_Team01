@@ -45,7 +45,7 @@ def protect_requests():
 
 @auth.app_context_processor
 def inject_auth():
-    return {"current_user": current_user(), "csrf_token": csrf_token}
+    return {"current_user": current_user(), "csrf_token": csrf_token, "form_csrf_token": csrf_token}
 
 
 @auth.route("/register", methods=["GET", "POST"])
