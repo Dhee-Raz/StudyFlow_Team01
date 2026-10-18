@@ -17,6 +17,7 @@ def site(monkeypatch):
         app.add_url_rule('/' + endpoint, endpoint, lambda: '')
     auth = Blueprint('auth', __name__)
     auth.add_url_rule('/login', endpoint='login', view_func=lambda: '')
+    auth.add_url_rule('/register', endpoint='register', view_func=lambda: '')
     auth.add_url_rule('/logout', endpoint='logout', view_func=lambda: '')
     app.register_blueprint(auth)
     app.context_processor(lambda: {'form_csrf_token': lambda: 'standalone-test-token'})
