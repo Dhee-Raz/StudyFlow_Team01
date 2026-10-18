@@ -63,7 +63,7 @@ def test_course_form_to_database_to_generated_schedule(client, planner):
     assert client.get("/").status_code == 200
     assert b"No upcoming study sessions" in client.get("/schedule").data
 
-    course_page = client.post(
+    course_page = post(client,
         "/add-course", data={"name": "CS 3398"}, follow_redirects=True
     )
     assert course_page.status_code == 200
@@ -78,7 +78,7 @@ def test_course_form_to_database_to_generated_schedule(client, planner):
     assert f'value="{course_id}"'.encode() in assignment_form.data
     assert b"CS 3398" in assignment_form.data
 
-    response = client.post(
+    response = post(client,
         "/add-assignment",
         data={
             "course_id": str(course_id),
@@ -119,7 +119,7 @@ def test_invalid_assignment_does_not_create_sessions(client, planner):
     post(client,"/add-course", data={"name": "CS 3398"})
     with planner.app.app_context():
         course_id = planner.Course.query.one().id
-    response = client.post(
+    response = post(client,
         "/add-assignment",
         data={
             "course_id": str(course_id),
@@ -141,7 +141,7 @@ def test_assignment_without_course_guides_student_to_add_course(client, planner)
     form = client.get("/add-assignment")
     assert form.status_code == 200
     assert b"Add a course before creating an assignment" in form.data
-    response = client.post("/add-assignment", data={}, follow_redirects=True)
+    response = post(client,"/add-assignment", data={}, follow_redirects=True)
     assert response.status_code == 200
     assert response.request.path == "/add-course"
     with planner.app.app_context():
