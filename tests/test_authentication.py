@@ -3,6 +3,7 @@ import importlib
 
 import pytest
 from werkzeug.security import check_password_hash
+from models import User
 
 
 @pytest.fixture
@@ -41,7 +42,7 @@ def test_registration_hashes_password_and_normalizes_email(planner):
         assert response.status_code == 302
         assert browser.get("/").status_code == 200
     with planner.app.app_context():
-        user = planner.db.session.query(planner.db.Model.registry._class_registry["User"]).one()
+        user = planner.db.session.query(User).one()
         assert user.email == "student@example.edu"
         assert user.password_hash != "correct-password-123"
         assert check_password_hash(user.password_hash, "correct-password-123")
