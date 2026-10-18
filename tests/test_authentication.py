@@ -77,7 +77,8 @@ def test_csrf_rejects_missing_tokens(planner):
 
 
 def test_user_isolation_for_planner_records(planner):
-    with planner.app.test_client() as alice, planner.app.test_client() as bob:
+    with planner.app.test_client() as alice:
+        bob = planner.app.test_client()
         register(alice, "alice@example.edu")
         assert submit(alice, "/add-course", {"name": "Alice only"}).status_code == 302
         with planner.app.app_context():
