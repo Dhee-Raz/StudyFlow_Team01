@@ -59,10 +59,10 @@ def deadline(value, zone):
     return parsed.astimezone(ZoneInfo(zone)).replace(tzinfo=None)
 
 
-def import_courses(record):
+def import_courses(record, owner_id):
     base_url = record['url']
     account = numeric_id(record['profile']['id'])
-    prefix = f'{base_url}|{account}|'
+    prefix = f'{owner_id}|{base_url}|{account}|'
     zone = record['profile'].get('time_zone') or 'UTC'
     try:
         ZoneInfo(zone)
@@ -123,7 +123,7 @@ def import_courses(record):
             course_key = prefix + str(cid)
             course = Course.query.filter_by(canvas_key=course_key).first()
             if course is None:
-                course = Course(name=name, canvas_key=course_key)
+                course = Course(name=name, canvas_key=course_key, user_id=owner_id)
                 db.session.add(course)
                 counts['courses'] += 1
             else:
@@ -133,7 +133,7 @@ def import_courses(record):
                 if Assignment.query.filter_by(canvas_key=key).first() is not None:
                     counts['skipped'] += 1
                     continue
-                db.session.add(Assignment(course=course, canvas_key=key, estimated_hours=0, **values))
+                db.session.add(Assignment(course=course, canvas_key=key, estimated_hours=2, **values))
                 counts['assignments'] += 1
                 counts['missing_deadlines'] += values['due_date'] is None
         db.session.commit()

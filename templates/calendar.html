@@ -66,6 +66,7 @@
             <p class="calendar-category academic-text">Academic · {{ selected_item.course.name }}</p>
           </div>
           <form method="post" action="{{ url_for('delete_calendar_assignment', assignment_id=selected_item.id) }}" class="confirm-delete" data-confirm="Delete '{{ selected_item.title }}' from your calendar? This cannot be undone.">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="return_year" value="{{ year }}">
             <input type="hidden" name="return_month" value="{{ month }}">
             <button class="icon-btn calendar-delete-btn" type="submit" aria-label="Delete selected assignment" title="Delete assignment">
@@ -74,6 +75,7 @@
           </form>
         </div>
           <form class="form" method="post" action="{{ url_for('update_calendar_assignment', assignment_id=selected_item.id) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <label for="assignment-title">Title</label>
             <input id="assignment-title" name="title" type="text" maxlength="200" value="{{ selected_item.title }}" required>
             <label for="assignment-due-date">Due date</label>
@@ -91,6 +93,7 @@
             <p class="calendar-category personal-text">Personal responsibility</p>
           </div>
           <form method="post" action="{{ url_for('delete_personal_task', task_id=selected_item.id) }}" class="confirm-delete" data-confirm="Delete '{{ selected_item.title }}' from your calendar? This cannot be undone.">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="return_year" value="{{ year }}">
             <input type="hidden" name="return_month" value="{{ month }}">
             <button class="icon-btn calendar-delete-btn" type="submit" aria-label="Delete selected personal responsibility" title="Delete personal responsibility">
@@ -99,6 +102,7 @@
           </form>
         </div>
           <form class="form" method="post" action="{{ url_for('update_personal_task', task_id=selected_item.id) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <label for="personal-title">Title</label>
             <input id="personal-title" name="title" type="text" maxlength="200" value="{{ selected_item.title }}" required>
             <label for="personal-due-date">Date</label>
@@ -115,6 +119,7 @@
   <details class="calendar-add-panel">
     <summary>Add personal responsibility</summary>
     <form class="form calendar-add-form" method="post" action="{{ url_for('add_personal_task') }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="return_year" value="{{ year }}">
       <input type="hidden" name="return_month" value="{{ month }}">
       <label for="new-personal-title">Title</label>

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Log in - StudyFlow{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Log in</h1><p>Access your personal study planner.</p></div>
+<div class="form-card"><form method="post" action="{{ url_for('auth.login') }}" class="form">
+<input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+<label for="email">Email</label><input id="email" type="email" name="email" required autocomplete="email" value="{{ request.form.get('email','') }}">
+<label for="password">Password</label><input id="password" type="password" name="password" required autocomplete="current-password">
+<button type="submit">Log in</button>
+</form><p>New here? <a href="{{ url_for('auth.register') }}">Create an account</a>.</p></div>
+{% endblock %}

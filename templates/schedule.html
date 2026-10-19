@@ -1,48 +1,99 @@
+{# Schedule view. app.schedule supplies due_today, exams, visible_days, and extra_days. Each day/session pair is rendered through _schedule_day.html. #}
 {% extends "base.html" %}
-
-{% block title %}Study Schedule - StudyFlow{% endblock %}
-
+{% block title %}Schedule - StudyFlow{% endblock %}
 {% block content %}
   <div class="page-header">
-    <h1>Your Study Schedule</h1>
-    <p>Your daily study sessions, organized by date.</p>
+    <h1>Study Schedule</h1>
+    <p>Your upcoming sessions, spread out day by day.</p>
   </div>
 
-  {% if schedule %}
-    <div class="course-stack">
-      {% for session_date, sessions in schedule %}
-        <section class="card">
-          <div class="card-header">
-            <h2>{{ session_date.strftime("%A, %B %d, %Y") }}</h2>
-          </div>
+  {% if due_today %}
+  <section class="card today-card">
+    <div class="card-header today-header">
+      <h2>Things to Do Today</h2>
+      {% if due_today %}<span class="badge">{{ due_today|length }} due</span>{% endif %}
+    </div>
+    <div class="card-body">
+      {% if not due_today %}
+        <p class="no-assignments">Nothing due today &mdash; you're clear.</p>
+      {% else %}
+        <ul class="assignment-list grouped">
+          {% for assignment in due_today %}
+            {% set canvas_url = canvas_assignment_url(assignment) %}
+            <li>
+              {% if canvas_url %}
+                <a href="{{ canvas_url }}" target="_blank" rel="noopener noreferrer" class="assignment-title-link">{{ assignment.title }}</a>
+              {% else %}
+                <strong>{{ assignment.title }}</strong>
+              {% endif %}
+              <span class="meta">
+                {{ assignment.course.name if assignment.course else "Personal" }}
+                {% if assignment.points_possible %}
+                  &middot; {{ assignment.points_possible|round(0, "floor")|int }} pts
+                {% endif %}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  </section>
 
-          <div class="card-body">
-            <ul class="assignment-list">
-              {% for session in sessions %}
-                <li>
-                  <strong>{{ session.assignment.title }}</strong>
-                  <span class="meta">
-                    {{ session.assignment.course.name }}
-                    · {{ "%.2f"|format(session.duration) }} hours
-                  </span>
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
-        </section>
-      {% endfor %}
-    </div>
-  {% else %}
-    <div class="empty-state">
-      No upcoming study sessions yet.
-      Sessions will appear here when you have assignments
-      with study hours and a current or future due date.
-    </div>
+  {% endif %}
+  {% if exams %}
+    <section class="card exams-card">
+      <div class="card-header">
+        <h2>Upcoming Exams</h2>
+      </div>
+      <div class="card-body">
+        <ul class="assignment-list grouped">
+          {% for entry in exams %}
+            {% set exam = entry.assignment %}
+            {% set canvas_url = canvas_assignment_url(exam) %}
+            <li>
+              <div class="session-item">
+                <span>
+                  {% if canvas_url %}
+                    <a href="{{ canvas_url }}" target="_blank" rel="noopener noreferrer" class="assignment-title-link">{{ exam.title }}</a>
+                  {% else %}
+                    <strong>{{ exam.title }}</strong>
+                  {% endif %}
+                  <span class="meta">{{ exam.course.name if exam.course else "Personal" }}</span>
+                </span>
+                <span class="exam-countdown">
+                  {% if entry.days_until == 0 %}
+                    Today!
+                  {% elif entry.days_until == 1 %}
+                    Tomorrow
+                  {% else %}
+                    Coming up in {{ entry.days_until }} days
+                  {% endif %}
+                </span>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
   {% endif %}
 
-  <div class="actions">
-    <a class="btn btn-secondary" href="{{ url_for('index') }}">
-      Back to Courses
-    </a>
-  </div>
+  {% if not visible_days and not extra_days %}
+    <div class="empty-state">
+      <span class="icon">🗓️</span>
+      No upcoming study sessions yet. <a href="{{ url_for('add_assignment') }}">Add an assignment</a> to generate a schedule.
+    </div>
+  {% else %}
+    {% for day, sessions in visible_days %}
+      {% include "_schedule_day.html" %}
+    {% endfor %}
+
+    {% if extra_days %}
+      <details class="more-groups">
+        <summary>See the rest of the semester ({{ extra_days|length }} more day{{ "s" if extra_days|length != 1 }})</summary>
+        {% for day, sessions in extra_days %}
+          {% include "_schedule_day.html" %}
+        {% endfor %}
+      </details>
+    {% endif %}
+  {% endif %}
 {% endblock %}

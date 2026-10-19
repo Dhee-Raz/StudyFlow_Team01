@@ -1,56 +1,90 @@
+{# Course dashboard. app.index supplies course_data entries containing course, upcoming_count, visible_groups, extra_groups, and past. Native details elements expand additional dates without JavaScript. #}
 {% extends "base.html" %}
 {% block title %}Courses - StudyFlow{% endblock %}
 {% block content %}
   <div class="page-header">
-    <h1>Your Courses</h1>
+    <h1>{{ (canvas_user_name ~ "’s Courses") if canvas_user_name else "Your Courses" }}</h1>
     <p>Everything you're taking, and what's due in each.</p>
   </div>
-  {% if not courses %}
+
+  {% if not course_data %}
     <div class="empty-state">
       <span class="icon">🎓</span>
-      No courses yet. <a href="{{ url_for('add_course') }}">Add your first course</a>.
+      No courses yet. <a href="{{ url_for('add_course') }}">Add your first course</a>,
+      or <a href="{{ url_for('connect_canvas') }}">import from Canvas</a>.
     </div>
   {% else %}
     <div class="course-stack">
-      {% for course in courses %}
+      {% for entry in course_data %}
+        {% set course = entry.course %}
         <section class="card course-card">
           <div class="card-header">
             <h2>{{ course.name }}</h2>
-            <form method="post" action="{{ url_for('delete_course', course_id=course.id) }}" class="confirm-delete" data-confirm="Delete {{ course.name }}? This will also remove its assignments.">
-              <button type="submit" class="btn btn-danger" aria-label="Delete {{ course.name }}">Delete</button>
-            </form>
+            <span class="header-actions">
+              <span class="badge">{{ entry.upcoming_count }} upcoming</span>
+              <form method="post" action="{{ url_for('delete_course', course_id=course.id) }}" class="confirm-delete" data-confirm="Delete &ldquo;{{ course.name }}&rdquo;? This will also remove its assignments.">
+                <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+                <button type="submit" class="icon-btn" aria-label="Delete {{ course.name }}" title="Delete course">
+                  <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 6h12M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6m-6.5 0 .6 9.4A1.5 1.5 0 0 0 7.6 17h4.8a1.5 1.5 0 0 0 1.5-1.6L14.5 6" />
+                  </svg>
+                </button>
+              </form>
+            </span>
           </div>
+
           <div class="card-body">
-            {% if course.assignments %}
-              <ul class="assignment-list">
-                {% set dated = course.assignments|selectattr('due_date')|sort(attribute='due_date')|list %}
-                {% set undated = course.assignments|rejectattr('due_date')|list %}
-                {% for assignment in dated + undated %}
-                  <li><strong>{{ assignment.title }}</strong>
-                    {% if assignment.canvas_url %}
-                      <a href="{{ assignment.canvas_url }}" target="_blank" rel="noopener noreferrer">Open in Canvas</a>
-                    {% endif %}
-                    {% if assignment.due_date %}
-                      <span class="meta">Due {{ assignment.due_date.strftime("%a, %b %d %Y") }}{% if assignment.canvas_timezone %} at {{ assignment.due_date.strftime("%H:%M") }} ({{ assignment.canvas_timezone }}){% endif %}</span>
-                    {% else %}
-                      <span class="meta">No deadline — needs review</span>
-                    {% endif %}
-                    {% if assignment.points_possible is not none %}<span class="meta">{{ assignment.points_possible }} points</span>{% endif %}
-                    {% if assignment.canvas_key and assignment.estimated_hours <= 0 %}
-                      <span class="meta">Study hours needed before scheduling</span>
-                    {% endif %}
-                    {% if assignment.canvas_key %}<a href="{{ url_for('calendar_view', selected='assignment-' ~ assignment.id) }}">Review deadline and study hours</a>{% endif %}
-                  </li>
-                {% endfor %}
-              </ul>
-            {% else %}
+            {% if not entry.visible_groups and not entry.past and not entry.undated %}
               <p class="no-assignments">No assignments yet.</p>
+            {% else %}
+              {% if entry.visible_groups %}
+                {% for group in entry.visible_groups %}
+                  {% include "_due_date_group.html" %}
+                {% endfor %}
+              {% else %}
+                <p class="no-assignments">No upcoming assignments.</p>
+              {% endif %}
+
+              {% if entry.extra_groups %}
+                <details class="more-groups">
+                  <summary>See {{ entry.extra_groups|length }} more due date{{ "s" if entry.extra_groups|length != 1 }}</summary>
+                  {% for group in entry.extra_groups %}
+                    {% include "_due_date_group.html" %}
+                  {% endfor %}
+                </details>
+              {% endif %}
+
+              {% if entry.undated %}
+                <h3>No deadline — needs review</h3>
+                {% for assignment in entry.undated %}
+                  <p>{{ assignment.title }} <a href="{{ url_for('calendar_view', selected='assignment-' ~ assignment.id) }}">Review deadline and study hours</a></p>
+                {% endfor %}
+              {% endif %}
+              {% if entry.past %}
+                <details class="past-assignments">
+                  <summary>{{ entry.past|length }} past assignment{{ "s" if entry.past|length != 1 }}</summary>
+                  <ul class="assignment-list muted">
+                    {% for assignment in entry.past %}
+                      {% set canvas_url = canvas_assignment_url(assignment) %}
+                      <li>
+                        {% if canvas_url %}
+                          <a href="{{ canvas_url }}" target="_blank" rel="noopener noreferrer" class="assignment-title-link">{{ assignment.title }}</a>
+                        {% else %}
+                          <strong>{{ assignment.title }}</strong>
+                        {% endif %}
+                        <span class="meta">Was due {{ assignment.due_date.strftime("%a, %b %d %Y") }}</span>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </details>
+              {% endif %}
             {% endif %}
           </div>
         </section>
       {% endfor %}
     </div>
   {% endif %}
+
   <div class="actions">
     <a class="btn btn-primary" href="{{ url_for('add_course') }}">+ Add Course</a>
     <a class="btn btn-secondary" href="{{ url_for('add_assignment') }}">+ Add Assignment</a>

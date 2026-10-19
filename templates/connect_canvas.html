@@ -14,11 +14,13 @@
     <p>Import your active student courses and their assignments. Existing imported items will be skipped.</p>
     <form method="post" action="{{ url_for('import_canvas') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
       <button class="btn btn-primary" type="submit">Import Courses and Assignments</button>
     </form>
-    <p>Study hours start at zero. Add an estimate in Calendar before scheduling. Missing deadlines are marked for review.</p>
+    <p>Imported assignments start with a 2-hour study estimate. Adjust it in Calendar. Missing deadlines are marked for review.</p>
     <form method="post" action="{{ url_for('disconnect_canvas') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
       <button class="btn btn-danger" type="submit">Disconnect Canvas</button>
     </form>
   </div>
@@ -27,6 +29,7 @@
 <div class="form-card">
   <form method="post" class="form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
     <label for="canvas_url">Canvas school URL</label>
     <input id="canvas_url" name="canvas_url" type="url" placeholder="https://school.instructure.com" required maxlength="255">
     <label for="access_token">Personal access token</label>

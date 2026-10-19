@@ -141,14 +141,15 @@ def register_canvas(app):
         if not record:
             return page('Connect to Canvas before importing. Your previous connection may have expired.', 400)
         try:
-            counts = import_courses(record)
+            from auth import current_user
+            counts = import_courses(record, current_user().id)
         except CanvasImportError as error:
             return page(str(error), 400)
         flash(f"Import complete: {counts['courses']} courses added, "
               f"{counts['assignments']} assignments added, {counts['skipped']} items skipped, "
               f"{counts['failed']} invalid items failed. "
               f"{counts['missing_deadlines']} new assignments need a deadline. "
-              "Add study hours before scheduling imported assignments.")
+              "Imported assignments start with an editable 2-hour study estimate.")
         return redirect(url_for('index'))
 
     @app.after_request

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Register - StudyFlow{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Create your account</h1><p>Keep your study plans in one place.</p></div>
+<div class="form-card"><form method="post" action="{{ url_for('auth.register') }}" class="form">
+<input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+<label for="email">Email</label><input id="email" type="email" name="email" maxlength="255" required autocomplete="email" value="{{ request.form.get('email','') }}">
+<label for="password">Password (at least 12 characters)</label><input id="password" type="password" name="password" minlength="12" required autocomplete="new-password">
+<label for="confirm">Confirm password</label><input id="confirm" type="password" name="confirm_password" minlength="12" required autocomplete="new-password">
+<button type="submit">Register</button>
+</form><p>Already registered? <a href="{{ url_for('auth.login') }}">Log in</a>.</p></div>
+{% endblock %}

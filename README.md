@@ -85,8 +85,8 @@ Security and current scope:
   list of exact hostnames. Only configure real Canvas hosts; never internal services.
 - Requests use HTTPS, a timeout, and no redirects. Connection/disconnection forms
   check CSRF tokens; connection responses use `Cache-Control: no-store`.
-- Current `main` has no account authentication. This is a single-process development
-  implementation, not persistent per-user credential storage. Before multi-worker
+- The shared app now requires account authentication. Canvas connections remain
+  browser-scoped and ephemeral, not persistent credential storage. Before multi-worker
   or multi-user deployment, integrate the team's login system and an encrypted,
   shared credential store. Set a private `STUDYFLOW_SECRET_KEY` and serve over HTTPS.
 
@@ -104,8 +104,8 @@ added, skipped items, invalid items, and assignments needing a deadline.
 - Canvas profile timezone is used for deadline display (UTC if absent or invalid).
   No deadline is stored as `NULL`, clearly marked for review, and excluded from calendar
   dates and scheduling until a date is provided.
-- Estimated study hours start at **0**; importing never requires manual course or
-  assignment entry. Use **Review deadline and study hours** to enter an estimate in
+- Estimated study hours start at an editable **2 hours**; importing never requires manual course or
+  assignment entry. Use **Review deadline and study hours** to adjust the estimate in
   Calendar. Scheduling starts only after a deadline and positive estimate exist.
 - Duplicate keys include Canvas host, Canvas account ID, course ID, and assignment ID.
   Reimporting skips existing records and preserves their local edits and hours.
@@ -120,11 +120,10 @@ added, skipped items, invalid items, and assignments needing a deadline.
   repeatable SQLite migration. It adds import metadata/unique indexes and allows
   missing assignment deadlines while preserving records and indexes. **Back up your
   SQLite database before upgrading.** No personal databases or tokens are committed.
-- This remains a **single-user local planner**. Imported IDs are separated by Canvas
-  account to avoid collisions, but the planner has no login/access-control layer and
-  its course listing is shared. Do not deploy it as a shared multi-user service until
-  the team's authentication/ownership work is integrated. Ticket 9's connection
-  lifetime and single-process restrictions still apply.
+- Imports now belong to the logged-in StudyFlow user. Duplicate keys include that
+  user's ID as well as the Canvas account and source IDs. Course/calendar/schedule
+  views retain the team's account ownership checks. Ticket 9's one-hour,
+  single-process token lifetime still applies.
 
 ### Try this branch
 
@@ -144,3 +143,111 @@ API references: [courses](https://developerdocs.instructure.com/services/canvas/
 [assignments](https://developerdocs.instructure.com/services/canvas/resources/assignments),
 [pagination](https://developerdocs.instructure.com/services/canvas/basics/file.pagination).
 Automated tests use fake HTTP responses; a real school-token smoke test is still needed.
+## Sprint 2 Ticket 1 — account database foundation
+
+The new `User` model stores an ID, normalized unique email address, password hash
+and creation timestamp. Courses and personal tasks have required `user_id`
+foreign keys; assignments continue to belong to a user through their course.
+
+**Important:** This ticket implements the data layer only. Registration/login,
+per-user access control, and updating UI routes to select the signed-in owner
+are Tickets 2 and 3. Until those tickets are integrated, the pre-authentication
+course/task creation routes cannot insert into the new non-nullable owner
+columns. Do not deploy this branch as a complete multi-user application.
+
+### Existing SQLite databases: migrate before using the new code
+
+1. Stop Flask. Keep your existing database safe; never delete `instance/`.
+2. Install the requirements in your Python virtual environment.
+3. Select the **specific account** that should own legacy course and task data.
+   Run from the repository root, using the actual database file path:
+
+   ```bash
+   python scripts/migrate_users.py --database instance/studyflow.db --legacy-email student@example.edu
+   ```
+
+4. At the prompts, enter and confirm a password. It is never written to shell
+   history or stored in plaintext; only a salted password hash is stored.
+5. Verify the command reports success and a
+   `studyflow.db.pre-users-<timestamp>.bak` backup. The migration preserves
+   course, assignment and personal-task records (including original IDs).
+6. On a fresh database, no migration is required; SQLAlchemy creates the
+   new tables using the updated models.
+
+This migration intentionally refuses ambiguous or unexpected schemas, repeated
+migrations, orphaned assignments, and databases with custom course/task
+indexes or triggers. Resolve those cases manually rather than risk data loss.
+It uses SQLite's backup API and a transactional table rebuild; do not run it
+concurrently with a live application. Existing database files and backups
+must stay out of Git.
+
+### Ticket 1 verification
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q tests/test_user_migration.py
+python -m pytest -q
+```
+
+The first test verifies record preservation, password hashes, the ownership
+foreign keys, a usable backup and rejection of a second migration. The other
+Sprint 1 tests must continue to pass after later tickets update their fixture
+setup for authenticated users.
+
+## Sprint 2 Ticket 2 — Registration and login
+
+Ticket 2 builds on the Sprint 2 Ticket 1 user/ownership database model.
+**Migrate an existing database before running this branch** using the
+Ticket 1 instructions above. The two pull requests should be reviewed
+and integrated together because this branch is based on Ticket 1.
+
+- Register at `/register` using an email address and a password of at
+  least 12 characters. Email is normalized before storage. Passwords
+  are stored as salted hashes, never plaintext.
+- Log in at `/login`; log out using the navigation form.
+- The planner requires login. Each course and personal task belongs to
+  the signed-in account; assignment ownership follows its course.
+- All state-changing forms require an anti-CSRF token. Missing or
+  invalid tokens return HTTP 400.
+- The existing course, assignment, and calendar routes now scope queries,
+  edits, and deletions by account ID.
+
+### Test
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q tests/test_authentication.py
+python -m pytest -q tests/test_integration.py
+python -m pytest -q tests/test_scheduler.py tests/test_user_migration.py
+```
+
+**Security note:** Set `STUDYFLOW_SECRET_KEY` to a long random value
+before hosting publicly. The fallback key is for local development only;
+never commit production credentials. Authentication is not a substitute
+for HTTPS, secure session-cookie deployment configuration, rate limiting,
+or production security review.
+
+## Ticket 10 — restored local UI improvements
+
+- Personalized Courses heading, upcoming counts, deadline groups, Due soon badges,
+  collapsed past/later deadlines, linked assignment titles, and compact delete icons.
+- No-deadline assignments remain visible with a review link; deadline time/timezone,
+  points, and Calendar editing remain available.
+- Schedule includes Things to Do Today (highest points first), exam countdowns,
+  and a collapsible remainder after 30 days. Exams are recognized by title keywords.
+- New Canvas assignments default to an editable **2 hours**. Existing estimates
+  are preserved on repeat imports. Imported assignments use the original local
+  spaced-session algorithm with a soft three-hour daily cap; the deadline wins if
+  capacity is insufficient. Manual assignments retain the team's daily scheduler.
+- Texas State's verified `canvas.txstate.edu` domain is enabled by default.
+  `STUDYFLOW_CANVAS_ALLOWED_HOSTS` can override the trusted custom-domain list.
+- Incorporated the team's merged authentication and Calendar work. Sign in before
+  connecting/importing. Imports are owned by that StudyFlow user. The logged-in
+  Canvas page also fixes a CSRF helper name collision with the shared navigation.
+
+Use Python 3.12 as in CI; the older macOS Python may lack the scrypt support used
+by the team's authentication code. Before starting with legacy data, follow the
+Sprint 2 user migration instructions below/above. That migration intentionally
+rejects custom schemas: if you already ran an earlier Ticket 10 preview on your
+legacy database, preserve it and use a fresh database for this branch rather than
+forcing the migration. Do not delete your existing database.

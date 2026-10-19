@@ -15,6 +15,7 @@
   {% else %}
     <div class="form-card">
       <form method="post" action="{{ url_for('add_assignment') }}" class="form">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         <label for="course_id">Course</label>
         <select id="course_id" name="course_id" required autofocus>
           <option value="" disabled {{ 'selected' if not selected_course_id }}>Choose a course</option>
