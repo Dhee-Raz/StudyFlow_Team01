@@ -32,6 +32,30 @@
     </section>
   {% endif %}
 
+  {% if progress %}
+    <section class="card">
+      <div class="card-header">
+        <h3>Progress</h3>
+      </div>
+      <div class="card-body">
+        <ul class="assignment-list">
+          {% for item in progress %}
+            <li>
+              <span>{{ item.assignment.title }}</span>
+              <div class="progress-bar" role="progressbar"
+                   aria-valuenow="{{ item.percent }}" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-fill" style="width: {{ item.percent }}%"></div>
+              </div>
+              <span class="meta">
+                {{ "%.2f"|format(item.completed) }} of {{ "%.2f"|format(item.estimated) }} hrs completed ({{ item.percent }}%)
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+  {% endif %}
+
   {% if schedule %}
     <div class="course-stack">
       {% for session_date, sessions in schedule %}
@@ -43,13 +67,29 @@
           <div class="card-body">
             <ul class="assignment-list">
               {% for session in sessions %}
-                <li>
-                  <strong>{{ session.assignment.title }}</strong>
-                  <span class="meta">
-                    {{ session.assignment.course.name }}
-                    · {{ "%.2f"|format(session.duration_hours) }} hours
-                    {% if session.completed %}· Completed{% endif %}
-                  </span>
+                <li class="session-row{% if session.completed %} session-done{% endif %}">
+                  <div class="session-info">
+                    <strong>{{ session.assignment.title }}</strong>
+                    <span class="meta">
+                      {{ session.assignment.course.name }}
+                      · {{ "%.2f"|format(session.duration_hours) }} hours
+                    </span>
+                  </div>
+                  <div class="session-actions">
+                    {% if session.completed %}
+                      <span class="badge badge-done">Completed</span>
+                    {% elif session.session_date == today %}
+                      <span class="badge">Today</span>
+                    {% else %}
+                      <span class="badge badge-upcoming">Upcoming</span>
+                    {% endif %}
+                    <form method="post" action="{{ url_for('toggle_session', session_id=session.id) }}">
+                      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-secondary btn-small">
+                        {% if session.completed %}Undo{% else %}Mark complete{% endif %}
+                      </button>
+                    </form>
+                  </div>
                 </li>
               {% endfor %}
             </ul>

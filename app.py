@@ -331,7 +331,10 @@ def update_calendar_assignment(assignment_id):
 @app.route("/calendar/assignment/<int:assignment_id>/delete", methods=["POST"])
 @login_required
 def delete_calendar_assignment(assignment_id):
-    assignment = db.get_or_404(Assignment, assignment_id)
+    # Only the owner of the assignment's course may delete it.
+    assignment = Assignment.query.join(Course).filter(
+        Assignment.id == assignment_id, Course.user_id == current_user().id
+    ).first_or_404()
     year = request.form.get("return_year", type=int)
     month = request.form.get("return_month", type=int)
     db.session.delete(assignment)
@@ -368,11 +371,51 @@ def schedule():
     ]
     needs_attention.sort(key=lambda item: item["assignment"].due_date)
 
+    # SCRUM-27: completed hours vs estimated hours for each assignment.
+    completed_hours = {}
+    for session in StudySession.query.filter_by(user_id=user.id, completed=True):
+        completed_hours[session.assignment_id] = (
+            completed_hours.get(session.assignment_id, 0.0) + session.duration_hours
+        )
+    progress = []
+    for assignment in sorted(assignments.values(), key=lambda a: a.due_date):
+        done = round(completed_hours.get(assignment.id, 0.0), 2)
+        estimated = assignment.estimated_hours or 0.0
+        percent = min(100, round(done / estimated * 100)) if estimated else 0
+        progress.append({
+            "assignment": assignment,
+            "completed": done,
+            "estimated": estimated,
+            "percent": percent,
+        })
+
     return render_template(
         "schedule.html",
         schedule=sorted(sessions_by_date.items()),
         needs_attention=needs_attention,
+        progress=progress,
+        today=today,
     )
+
+
+@app.route("/sessions/<int:session_id>/toggle", methods=["POST"])
+@login_required
+def toggle_session(session_id):
+    """Mark a study session complete or incomplete (owner only)."""
+    # Filtering by user_id means other users get a 404, not someone else's session.
+    study_session = StudySession.query.filter_by(
+        id=session_id, user_id=current_user().id
+    ).first_or_404()
+
+    study_session.completed = not study_session.completed
+    study_session.completed_at = datetime.now() if study_session.completed else None
+    db.session.commit()
+
+    if study_session.completed:
+        flash("Nice work! Session marked complete.")
+    else:
+        flash("Session marked incomplete.")
+    return redirect(url_for("schedule"))
 
 
 app.config["CANVAS_ALLOWED_HOSTS"] = tuple(
