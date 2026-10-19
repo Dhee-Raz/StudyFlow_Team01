@@ -8,6 +8,30 @@
     <p>Your daily study sessions, organized by date.</p>
   </div>
 
+  {% if needs_attention %}
+    <section class="card">
+      <div class="card-header">
+        <h3>Unscheduled hours</h3>
+      </div>
+      <div class="card-body">
+        <ul class="assignment-list">
+          {% for item in needs_attention %}
+            <li>
+              {{ item.assignment.title }}
+              <span class="meta">
+                {% if item.status == "overdue" %}
+                  Deadline passed · {{ "%.2f"|format(item.unscheduled) }} hours not completed
+                {% else %}
+                  {{ "%.2f"|format(item.unscheduled) }} hours don't fit before the due date
+                {% endif %}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+  {% endif %}
+
   {% if schedule %}
     <div class="course-stack">
       {% for session_date, sessions in schedule %}
@@ -23,7 +47,8 @@
                   <strong>{{ session.assignment.title }}</strong>
                   <span class="meta">
                     {{ session.assignment.course.name }}
-                    · {{ "%.2f"|format(session.duration) }} hours
+                    · {{ "%.2f"|format(session.duration_hours) }} hours
+                    {% if session.completed %}· Completed{% endif %}
                   </span>
                 </li>
               {% endfor %}

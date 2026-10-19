@@ -54,6 +54,14 @@ class Assignment(db.Model):
     due_date = db.Column(db.DateTime, nullable=False)
     estimated_hours = db.Column(db.Float, nullable=False)
 
+    # Deleting an assignment also deletes its saved study sessions.
+    study_sessions = db.relationship(
+        "StudySession",
+        backref="assignment",
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
+
     created_at = db.Column(
         db.DateTime,
         default=lambda: datetime.now(timezone.utc),
@@ -67,6 +75,25 @@ class PersonalTask(db.Model):
     title = db.Column(db.String(200), nullable=False)
     due_date = db.Column(db.DateTime, nullable=False)
     details = db.Column(db.Text, nullable=False, default="")
+    created_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+
+class StudySession(db.Model):
+    """One saved block of study time for an assignment on a specific day."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    assignment_id = db.Column(
+        db.Integer, db.ForeignKey("assignment.id"), nullable=False, index=True
+    )
+    session_date = db.Column(db.Date, nullable=False, index=True)
+    duration_hours = db.Column(db.Float, nullable=False)
+    completed = db.Column(db.Boolean, nullable=False, default=False)
+    completed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(
         db.DateTime,
         default=lambda: datetime.now(timezone.utc),

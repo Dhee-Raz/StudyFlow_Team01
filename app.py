@@ -7,8 +7,8 @@ from flask import Flask, flash, redirect, render_template, request, url_for
 from auth import auth, current_user, login_required
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from models import db, Course, Assignment, PersonalTask
-from scheduler import generate_study_sessions
+from models import db, Course, Assignment, PersonalTask, StudySession
+from scheduler import refresh_saved_sessions
 from canvas_connection import register_canvas
 
 @event.listens_for(Engine, "connect")
@@ -343,21 +343,35 @@ def delete_calendar_assignment(assignment_id):
 @app.route("/schedule")
 @login_required
 def schedule():
-    assignments = Assignment.query.join(Course).filter(Course.user_id == current_user().id).all()
+    user = current_user()
+    today = date.today()
+
+    # Rebuild saved sessions (keeps completed ones, never duplicates).
+    summaries = refresh_saved_sessions(db, user.id, today)
+
+    sessions = (
+        StudySession.query
+        .filter(StudySession.user_id == user.id, StudySession.session_date >= today)
+        .order_by(StudySession.session_date, StudySession.id)
+        .all()
+    )
     sessions_by_date = {}
+    for session in sessions:
+        sessions_by_date.setdefault(session.session_date, []).append(session)
 
-    for assignment in assignments:
-        sessions = generate_study_sessions(assignment)
-
-        for session in sessions:
-            session_date = session["date"]
-            sessions_by_date.setdefault(session_date, []).append(session)
-
-    sorted_schedule = sorted(sessions_by_date.items())
+    # Assignments with hours that could not fit, or whose deadline passed.
+    assignments = {a.id: a for a in Assignment.query.join(Course).filter(Course.user_id == user.id)}
+    needs_attention = [
+        {"assignment": assignments[assignment_id], **summary}
+        for assignment_id, summary in summaries.items()
+        if summary["unscheduled"] > 0
+    ]
+    needs_attention.sort(key=lambda item: item["assignment"].due_date)
 
     return render_template(
         "schedule.html",
-        schedule=sorted_schedule,
+        schedule=sorted(sessions_by_date.items()),
+        needs_attention=needs_attention,
     )
 
 
