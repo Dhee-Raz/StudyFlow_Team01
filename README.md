@@ -67,8 +67,8 @@ token, and select **Verify and Connect**. Create a token in Canvas under
 **Account → Settings → Approved Integrations → New Access Token**. School policy
 may disable personal tokens. Use a short expiration and never share the token.
 
-This ticket only verifies `GET /api/v1/users/self/profile`; it does not import or
-modify courses, assignments, or schedules. API reference:
+Connection verification uses `GET /api/v1/users/self/profile`. The import and sync
+buttons added in Tickets 10–11 fetch courses and assignments separately. API reference:
 https://developerdocs.instructure.com/services/canvas/resources/users
 
 Security and current scope:
@@ -85,14 +85,64 @@ Security and current scope:
   list of exact hostnames. Only configure real Canvas hosts; never internal services.
 - Requests use HTTPS, a timeout, and no redirects. Connection/disconnection forms
   check CSRF tokens; connection responses use `Cache-Control: no-store`.
-- Current `main` has no account authentication. This is a single-process development
-  implementation, not persistent per-user credential storage. Before multi-worker
+- The shared app now requires account authentication. Canvas connections remain
+  browser-scoped and ephemeral, not persistent credential storage. Before multi-worker
   or multi-user deployment, integrate the team's login system and an encrypted,
   shared credential store. Set a private `STUDYFLOW_SECRET_KEY` and serve over HTTPS.
 
 Install with `pip install -r requirements-dev.txt` and run `python -m pytest -q`.
 Canvas tests mock the API; they need no personal token and make no live requests.
 
+## Ticket 10 — Import Canvas courses and assignments
+
+After connecting, choose **Import Courses and Assignments**. StudyFlow fetches your
+active student courses and their assignments, including paginated results, then saves
+them to the existing Courses view. The import summary reports courses/assignments
+added, skipped items, invalid items, and assignments needing a deadline.
+
+- Titles, available deadlines, points, and safe Canvas assignment links are imported.
+- Canvas profile timezone is used for deadline display (UTC if absent or invalid).
+  No deadline is stored as `NULL`, clearly marked for review, and excluded from calendar
+  dates and scheduling until a date is provided.
+- Estimated study hours start at an editable **2 hours**; importing never requires manual course or
+  assignment entry. Use **Review deadline and study hours** to adjust the estimate in
+  Calendar. Scheduling starts only after a deadline and positive estimate exist.
+- Duplicate keys include Canvas host, Canvas account ID, course ID, and assignment ID.
+  Reimporting skips existing records and preserves their local edits and hours.
+  Use **Sync Canvas** to refresh existing source fields (Ticket 11).
+- All API pages are fetched before saving. HTTP/parse/pagination failures save nothing;
+  a database save failure rolls back the whole import. Malformed individual items are
+  counted as failed while valid items can be imported. Individual fields longer than
+  the existing model limits are truncated to 100 characters for courses and 200 for titles.
+- Redirects and pagination links outside the original HTTPS endpoint are rejected;
+  network requests are bounded by timeouts and a 100-page limit per endpoint.
+- Existing database tables are upgraded automatically at startup with an atomic,
+  repeatable SQLite migration. It adds import metadata/unique indexes and allows
+  missing assignment deadlines while preserving records and indexes. **Back up your
+  SQLite database before upgrading.** No personal databases or tokens are committed.
+- Imports now belong to the logged-in StudyFlow user. Duplicate keys include that
+  user's ID as well as the Canvas account and source IDs. Course/calendar/schedule
+  views retain the team's account ownership checks. Ticket 9's one-hour,
+  single-process token lifetime still applies.
+
+### Try this branch
+
+```bash
+git fetch origin
+git switch --track origin/feature/ticket-10-canvas-import
+pip install -r requirements-dev.txt
+python -m pytest -q
+python app.py
+```
+
+Open http://127.0.0.1:5001/connect-canvas, verify your token, and import. Inspect Courses,
+open an assignment in Canvas, then use its review link to add hours. Repeat the import
+and verify no duplicates are added. Disconnecting does not delete imported records.
+
+API references: [courses](https://developerdocs.instructure.com/services/canvas/resources/courses),
+[assignments](https://developerdocs.instructure.com/services/canvas/resources/assignments),
+[pagination](https://developerdocs.instructure.com/services/canvas/basics/file.pagination).
+Automated tests use fake HTTP responses; a real school-token smoke test is still needed.
 ## Sprint 2 Ticket 1 — account database foundation
 
 The new `User` model stores an ID, normalized unique email address, password hash
@@ -176,3 +226,67 @@ before hosting publicly. The fallback key is for local development only;
 never commit production credentials. Authentication is not a substitute
 for HTTPS, secure session-cookie deployment configuration, rate limiting,
 or production security review.
+
+## Ticket 10 — restored local UI improvements
+
+- Personalized Courses heading, upcoming counts, deadline groups, Due soon badges,
+  collapsed past/later deadlines, linked assignment titles, and compact delete icons.
+- No-deadline assignments remain visible with a review link; deadline time/timezone,
+  points, and Calendar editing remain available.
+- Schedule includes Things to Do Today (highest points first), exam countdowns,
+  and a collapsible remainder after 30 days. Exams are recognized by title keywords.
+- New Canvas assignments default to an editable **2 hours**. Existing estimates
+  are preserved on repeat imports. Imported assignments use the original local
+  spaced-session algorithm with a soft three-hour daily cap; the deadline wins if
+  capacity is insufficient. Manual assignments retain the team's daily scheduler.
+- Texas State's verified `canvas.txstate.edu` domain is enabled by default.
+  `STUDYFLOW_CANVAS_ALLOWED_HOSTS` can override the trusted custom-domain list.
+- Incorporated the team's merged authentication and Calendar work. Sign in before
+  connecting/importing. Imports are owned by that StudyFlow user. The logged-in
+  Canvas page also fixes a CSRF helper name collision with the shared navigation.
+
+Use Python 3.12 as in CI; the older macOS Python may lack the scrypt support used
+by the team's authentication code. Before starting with legacy data, follow the
+Sprint 2 user migration instructions below/above. That migration intentionally
+rejects custom schemas: if you already ran an earlier Ticket 10 preview on your
+legacy database, preserve it and use a fresh database for this branch rather than
+forcing the migration. Do not delete your existing database.
+
+## Ticket 11 — Manual Canvas sync
+
+After connecting, select **Sync Canvas** to add new courses/assignments and update
+existing Canvas titles, deadlines, points, and source links. Initial Import continues
+to skip existing records. Both operations report added, updated, skipped, and failed
+counts. Updated counts include renamed courses and changed assignments.
+
+Sync never replaces assignment rows or changes study-hour estimates. It does not
+write to or delete linked study-session/completion records. The saved-session and
+completion UI is still on teammates' unmerged branches; this release tests that
+linked completed-progress records survive sync, not that those unmerged features
+are already available. Future computed schedules reflect changed deadlines.
+
+Assignments no longer returned in a complete successful response are retained and
+marked **Not returned by Canvas — check source**. Reappearing assignments clear
+that flag. Invalid records disable missing-event inference for that sync, and a
+network/database failure retains existing planner data. A missing deadline is
+kept for review and excluded from scheduling. No automatic deletion occurs.
+
+All imports/syncs are scoped to the signed-in StudyFlow user and connected Canvas
+account. POST actions require both app and Canvas form CSRF tokens. The existing
+connection timeout, trusted hosts, HTTPS/no-redirect behavior, and token privacy
+remain unchanged. SQLite startup migration adds a default-false `canvas_missing`
+column to existing assignments. Back up databases before upgrading.
+
+### Import-to-schedule demo
+1. Register/sign in and verify a Canvas token on Connect Canvas.
+2. Import courses/assignments, inspect grouped course deadlines, and open Schedule.
+3. Edit one imported assignment's study hours via its **Edit** link.
+4. After a real Canvas title/deadline change, use **Sync Canvas**.
+5. Verify the source changes appear while your hours remain, and repeat Sync to
+   verify no duplicates. Disconnect and confirm planner data remains available.
+
+Automated tests simulate these updates, timezone/DST conversion, missing/reappearing
+assignments, invalid data, network failures, duplicate syncs, ownership, and linked
+completed progress. A real-token smoke test remains for teammates; tests never use
+personal tokens. The pending UI cleanup is included: readable title/details rows,
+compact Edit links, styled logout button, and no visible timezone labels.

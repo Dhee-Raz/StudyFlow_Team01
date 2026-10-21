@@ -1045,3 +1045,60 @@ h1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Course rows keep long titles separate from metadata and their single action. */
+.assignment-list.grouped .course-assignment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+.course-assignment-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  overflow-wrap: anywhere;
+}
+.course-assignment-content .assignment-title-link {
+  line-height: 1.45;
+}
+.course-assignment-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.course-assignment-details span { white-space: nowrap; }
+.assignment-edit {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.7rem;
+  white-space: nowrap;
+}
+.assignment-edit:hover { background: var(--primary-tint); }
+.undated-assignments { margin-top: 1rem; }
+.auth-logout { margin: 0; }
+.auth-logout button {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.auth-logout button:hover { color: var(--text); background: var(--primary-tint); }
+@media (max-width: 600px) {
+  .assignment-list.grouped .course-assignment-row { gap: 0.6rem; }
+  .course-assignment-details { gap: 0.25rem 0.7rem; }
+  .course-card .card-header { flex-wrap: wrap; gap: 0.75rem; }
+}

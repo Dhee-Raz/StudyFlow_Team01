@@ -1,0 +1,30 @@
+{# Reusable deadline group, included with group in scope: due_date, due_soon, and assignments. canvas_assignment_url comes from the Flask context processor. #}
+<div class="due-date-group">
+  <div class="due-date-heading">
+    <span>{{ group.due_date.strftime("%a, %b %d %Y") }}</span>
+    {% if group.due_soon %}
+      <span class="due-soon-badge">Due soon</span>
+    {% endif %}
+  </div>
+  <ul class="assignment-list grouped">
+    {% for assignment in group.assignments %}
+      {% set canvas_url = canvas_assignment_url(assignment) %}
+      <li class="course-assignment-row">
+        <div class="course-assignment-content">
+          {% if canvas_url %}
+            <a href="{{ canvas_url }}" target="_blank" rel="noopener noreferrer" class="assignment-title-link">{{ assignment.title }}</a>
+          {% else %}
+            <strong>{{ assignment.title }}</strong>
+          {% endif %}
+          {% if assignment.canvas_missing %}<span class="meta">Not returned by Canvas — check source</span>{% endif %}
+          <div class="course-assignment-details">
+            <span>{{ '%g'|format(assignment.estimated_hours) }} hrs study</span>
+            {% if assignment.points_possible is not none %}<span>{{ '%g'|format(assignment.points_possible) }} points</span>{% endif %}
+            {% if assignment.canvas_timezone %}<span>Due {{ assignment.due_date.strftime('%I:%M %p').lstrip('0') }}</span>{% endif %}
+          </div>
+        </div>
+        <a class="assignment-edit" href="{{ url_for('calendar_view', selected='assignment-' ~ assignment.id) }}" aria-label="Edit {{ assignment.title }}">Edit</a>
+      </li>
+    {% endfor %}
+  </ul>
+</div>

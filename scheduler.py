@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 
 def generate_study_sessions(assignment):
@@ -12,13 +13,15 @@ def generate_study_sessions(assignment):
     """
 
     # Handle invalid or zero estimated study time.
-    if assignment.estimated_hours <= 0:
+    if assignment.estimated_hours <= 0 or assignment.due_date is None:
         return []
 
     due_date = assignment.due_date
 
     # Support both timezone-aware and timezone-naive datetimes.
-    if due_date.tzinfo is not None:
+    if getattr(assignment, "canvas_timezone", None):
+        today = datetime.now(ZoneInfo(assignment.canvas_timezone)).date()
+    elif due_date.tzinfo is not None:
         today = datetime.now(timezone.utc).date()
     else:
         today = datetime.now().date()

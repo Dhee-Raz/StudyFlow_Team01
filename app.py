@@ -9,7 +9,9 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from models import db, Course, Assignment, PersonalTask
 from scheduler import generate_study_sessions
+from presentation import course_groups, schedule_sections
 from canvas_connection import register_canvas
+from migrations import upgrade_canvas_import
 
 @event.listens_for(Engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
@@ -26,12 +28,25 @@ db.init_app(app)
 app.register_blueprint(auth)
 with app.app_context():
     db.create_all()
+    upgrade_canvas_import(db.engine)
+
+
+@app.context_processor
+def canvas_display_helpers():
+    from flask import session
+    store = app.extensions.get("canvas_connections")
+    record = store.get(session.get("canvas_connection")) if store else None
+    return {
+        "canvas_user_name": record["profile"]["name"] if record else None,
+        "canvas_assignment_url": lambda assignment: assignment.canvas_url,
+    }
 
 
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html", courses=Course.query.filter_by(user_id=current_user().id).order_by(Course.name).all())
+    courses = Course.query.filter_by(user_id=current_user().id).order_by(Course.name).all()
+    return render_template("index.html", course_data=course_groups(courses, date.today()))
 
 
 @app.route("/add-course", methods=["GET", "POST"])
@@ -163,6 +178,8 @@ def calendar_view():
     }
 
     for assignment in Assignment.query.join(Course).filter(Course.user_id == current_user().id).order_by(Assignment.due_date).all():
+        if assignment.due_date is None:
+            continue
         due_day = assignment.due_date.date()
         if due_day in calendar_days:
             day_events = calendar_days[due_day]
@@ -321,7 +338,9 @@ def update_calendar_assignment(assignment_id):
         return _calendar_redirect(selected=f"assignment-{assignment.id}")
 
     assignment.title = title
-    assignment.due_date = datetime.combine(due_day, datetime.min.time())
+    # Updating only study hours must preserve the imported deadline's time.
+    if assignment.due_date is None or assignment.due_date.date() != due_day:
+        assignment.due_date = datetime.combine(due_day, datetime.min.time())
     assignment.estimated_hours = estimated_hours
     db.session.commit()
     flash("Assignment updated.")
@@ -344,31 +363,18 @@ def delete_calendar_assignment(assignment_id):
 @login_required
 def schedule():
     assignments = Assignment.query.join(Course).filter(Course.user_id == current_user().id).all()
-    sessions_by_date = {}
+    return render_template("schedule.html", **schedule_sections(assignments, date.today()))
 
-    for assignment in assignments:
-        sessions = generate_study_sessions(assignment)
-
-        for session in sessions:
-            session_date = session["date"]
-            sessions_by_date.setdefault(session_date, []).append(session)
-
-    sorted_schedule = sorted(sessions_by_date.items())
-
-    return render_template(
-        "schedule.html",
-        schedule=sorted_schedule,
-    )
 
 
 app.config["CANVAS_ALLOWED_HOSTS"] = tuple(
-    host.strip().lower() for host in os.environ.get("STUDYFLOW_CANVAS_ALLOWED_HOSTS", "").split(",") if host.strip()
+    host.strip().lower() for host in os.environ.get("STUDYFLOW_CANVAS_ALLOWED_HOSTS", "canvas.txstate.edu").split(",") if host.strip()
 )
 register_canvas(app)
 
 @app.before_request
 def protect_canvas_pages():
-    if request.endpoint in {"connect_canvas", "disconnect_canvas"} and current_user() is None:
+    if request.endpoint in {"connect_canvas", "disconnect_canvas", "import_canvas", "sync_canvas"} and current_user() is None:
         return redirect(url_for("auth.login"))
 
 
