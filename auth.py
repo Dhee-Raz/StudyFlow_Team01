@@ -65,7 +65,7 @@ def register():
         elif User.query.filter_by(email=email).first():
             flash("An account with that email already exists.")
         else:
-            user = User(email=email, password_hash=generate_password_hash(password))
+            user = User(email=email, password_hash=generate_password_hash(password, method="pbkdf2:sha256"))
             db.session.add(user)
             try:
                 db.session.commit()
