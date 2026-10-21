@@ -280,6 +280,7 @@ def add_personal_task():
 @app.route("/calendar/personal/<int:task_id>/delete", methods=["POST"])
 @login_required
 def delete_personal_task(task_id):
+    # Only fetch the task if it belongs to the logged-in user (404 otherwise)
     task = PersonalTask.query.filter_by(id=task_id, user_id=current_user().id).first_or_404()
     year = request.form.get("return_year", type=int)
     month = request.form.get("return_month", type=int)
@@ -292,7 +293,8 @@ def delete_personal_task(task_id):
 @app.route("/calendar/personal/<int:task_id>", methods=["POST"])
 @login_required
 def update_personal_task(task_id):
-    task = db.get_or_404(PersonalTask, task_id)
+    # Only fetch the assignment if its course belongs to the logged-in user (404 otherwise)
+    task = PersonalTask.query.filter_by(id=task_id, user_id=current_user().id).first_or_404()
     title = request.form.get("title", "").strip()
     due_day = _parse_calendar_date(request.form.get("due_date"))
     details = request.form.get("details", "").strip()
@@ -350,7 +352,10 @@ def update_calendar_assignment(assignment_id):
 @app.route("/calendar/assignment/<int:assignment_id>/delete", methods=["POST"])
 @login_required
 def delete_calendar_assignment(assignment_id):
-    assignment = db.get_or_404(Assignment, assignment_id)
+    assignment = Assignment.query.join(Course).filter(
+        Assignment.id == assignment_id,
+        Course.user_id == current_user().id,
+    ).first_or_404()    
     year = request.form.get("return_year", type=int)
     month = request.form.get("return_month", type=int)
     db.session.delete(assignment)

@@ -122,7 +122,8 @@ def import_courses(record, owner_id, *, sync=False):
         seen_keys = set()
         for cid, (name, items) in courses.items():
             course_key = prefix + str(cid)
-            course = Course.query.filter_by(canvas_key=course_key).first()
+            # Only match courses owned by this user
+            course = Course.query.filter_by(canvas_key=course_key, user_id=owner_id).first()
             if course is None:
                 course = Course(name=name, canvas_key=course_key, user_id=owner_id)
                 db.session.add(course)
@@ -135,7 +136,11 @@ def import_courses(record, owner_id, *, sync=False):
             for aid, values in items.items():
                 key = course_key + '|' + str(aid)
                 seen_keys.add(key)
-                existing = Assignment.query.filter_by(canvas_key=key).first()
+                # Only match assignments inside this user's courses
+                existing = Assignment.query.join(Course).filter(
+                    Assignment.canvas_key == key,
+                    Course.user_id == owner_id,
+                ).first()
                 if existing is not None:
                     if sync:
                         changed = existing.canvas_missing or any(getattr(existing, field) != value for field, value in values.items())
