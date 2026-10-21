@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import validates
@@ -26,6 +27,7 @@ class User(db.Model):
 
 
 class Course(db.Model):
+    canvas_key = db.Column(db.String(600), nullable=True)
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     name = db.Column(db.String(100), nullable=False)
@@ -42,6 +44,15 @@ class Course(db.Model):
 
 
 class Assignment(db.Model):
+    @property
+    def is_exam(self):
+        return bool(re.search(r"exam|mid[\s_-]?term", self.title, re.IGNORECASE))
+
+    canvas_key = db.Column(db.String(650), nullable=True)
+    canvas_missing = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    canvas_url = db.Column(db.String(600), nullable=True)
+    canvas_timezone = db.Column(db.String(100), nullable=True)
+    points_possible = db.Column(db.Float, nullable=True)
     id = db.Column(db.Integer, primary_key=True)
 
     course_id = db.Column(
@@ -51,7 +62,7 @@ class Assignment(db.Model):
     )
 
     title = db.Column(db.String(200), nullable=False)
-    due_date = db.Column(db.DateTime, nullable=False)
+    due_date = db.Column(db.DateTime, nullable=True)
     estimated_hours = db.Column(db.Float, nullable=False)
 
     # Deleting an assignment also deletes its saved study sessions.

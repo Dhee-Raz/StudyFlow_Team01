@@ -79,7 +79,7 @@
             <label for="assignment-title">Title</label>
             <input id="assignment-title" name="title" type="text" maxlength="200" value="{{ selected_item.title }}" required>
             <label for="assignment-due-date">Due date</label>
-            <input id="assignment-due-date" name="due_date" type="date" value="{{ selected_item.due_date.strftime('%Y-%m-%d') }}" required>
+            <input id="assignment-due-date" name="due_date" type="date" value="{{ selected_item.due_date.strftime('%Y-%m-%d') if selected_item.due_date else '' }}" required>
             <label for="assignment-hours">Estimated study hours</label>
             <input id="assignment-hours" name="estimated_hours" type="number" min="0.01" step="any" value="{{ selected_item.estimated_hours }}" required>
             <button type="submit">Save changes</button>
@@ -106,7 +106,7 @@
             <label for="personal-title">Title</label>
             <input id="personal-title" name="title" type="text" maxlength="200" value="{{ selected_item.title }}" required>
             <label for="personal-due-date">Date</label>
-            <input id="personal-due-date" name="due_date" type="date" value="{{ selected_item.due_date.strftime('%Y-%m-%d') }}" required>
+            <input id="personal-due-date" name="due_date" type="date" value="{{ selected_item.due_date.strftime('%Y-%m-%d') if selected_item.due_date else '' }}" required>
             <label for="personal-details">Details</label>
             <textarea id="personal-details" name="details" rows="3" maxlength="1000">{{ selected_item.details }}</textarea>
             <button type="submit">Save changes</button>

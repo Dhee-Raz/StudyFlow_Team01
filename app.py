@@ -7,9 +7,11 @@ from flask import Flask, flash, redirect, render_template, request, url_for
 from auth import auth, current_user, login_required
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from models import db, Course, Assignment, PersonalTask, StudySession
-from scheduler import refresh_saved_sessions
+from models import db, Course, Assignment, PersonalTask
+from scheduler import generate_study_sessions
+from presentation import course_groups, schedule_sections
 from canvas_connection import register_canvas
+from migrations import upgrade_canvas_import
 
 @event.listens_for(Engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
@@ -26,12 +28,25 @@ db.init_app(app)
 app.register_blueprint(auth)
 with app.app_context():
     db.create_all()
+    upgrade_canvas_import(db.engine)
+
+
+@app.context_processor
+def canvas_display_helpers():
+    from flask import session
+    store = app.extensions.get("canvas_connections")
+    record = store.get(session.get("canvas_connection")) if store else None
+    return {
+        "canvas_user_name": record["profile"]["name"] if record else None,
+        "canvas_assignment_url": lambda assignment: assignment.canvas_url,
+    }
 
 
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html", courses=Course.query.filter_by(user_id=current_user().id).order_by(Course.name).all())
+    courses = Course.query.filter_by(user_id=current_user().id).order_by(Course.name).all()
+    return render_template("index.html", course_data=course_groups(courses, date.today()))
 
 
 @app.route("/add-course", methods=["GET", "POST"])
@@ -163,6 +178,8 @@ def calendar_view():
     }
 
     for assignment in Assignment.query.join(Course).filter(Course.user_id == current_user().id).order_by(Assignment.due_date).all():
+        if assignment.due_date is None:
+            continue
         due_day = assignment.due_date.date()
         if due_day in calendar_days:
             day_events = calendar_days[due_day]
@@ -263,6 +280,7 @@ def add_personal_task():
 @app.route("/calendar/personal/<int:task_id>/delete", methods=["POST"])
 @login_required
 def delete_personal_task(task_id):
+    # Only fetch the task if it belongs to the logged-in user (404 otherwise)
     task = PersonalTask.query.filter_by(id=task_id, user_id=current_user().id).first_or_404()
     year = request.form.get("return_year", type=int)
     month = request.form.get("return_month", type=int)
@@ -275,7 +293,8 @@ def delete_personal_task(task_id):
 @app.route("/calendar/personal/<int:task_id>", methods=["POST"])
 @login_required
 def update_personal_task(task_id):
-    task = db.get_or_404(PersonalTask, task_id)
+    # Only fetch the assignment if its course belongs to the logged-in user (404 otherwise)
+    task = PersonalTask.query.filter_by(id=task_id, user_id=current_user().id).first_or_404()
     title = request.form.get("title", "").strip()
     due_day = _parse_calendar_date(request.form.get("due_date"))
     details = request.form.get("details", "").strip()
@@ -321,7 +340,9 @@ def update_calendar_assignment(assignment_id):
         return _calendar_redirect(selected=f"assignment-{assignment.id}")
 
     assignment.title = title
-    assignment.due_date = datetime.combine(due_day, datetime.min.time())
+    # Updating only study hours must preserve the imported deadline's time.
+    if assignment.due_date is None or assignment.due_date.date() != due_day:
+        assignment.due_date = datetime.combine(due_day, datetime.min.time())
     assignment.estimated_hours = estimated_hours
     db.session.commit()
     flash("Assignment updated.")
@@ -331,10 +352,10 @@ def update_calendar_assignment(assignment_id):
 @app.route("/calendar/assignment/<int:assignment_id>/delete", methods=["POST"])
 @login_required
 def delete_calendar_assignment(assignment_id):
-    # Only the owner of the assignment's course may delete it.
     assignment = Assignment.query.join(Course).filter(
-        Assignment.id == assignment_id, Course.user_id == current_user().id
-    ).first_or_404()
+        Assignment.id == assignment_id,
+        Course.user_id == current_user().id,
+    ).first_or_404()    
     year = request.form.get("return_year", type=int)
     month = request.form.get("return_month", type=int)
     db.session.delete(assignment)
@@ -346,56 +367,9 @@ def delete_calendar_assignment(assignment_id):
 @app.route("/schedule")
 @login_required
 def schedule():
-    user = current_user()
-    today = date.today()
+    assignments = Assignment.query.join(Course).filter(Course.user_id == current_user().id).all()
+    return render_template("schedule.html", **schedule_sections(assignments, date.today()))
 
-    # Rebuild saved sessions (keeps completed ones, never duplicates).
-    summaries = refresh_saved_sessions(db, user.id, today)
-
-    sessions = (
-        StudySession.query
-        .filter(StudySession.user_id == user.id, StudySession.session_date >= today)
-        .order_by(StudySession.session_date, StudySession.id)
-        .all()
-    )
-    sessions_by_date = {}
-    for session in sessions:
-        sessions_by_date.setdefault(session.session_date, []).append(session)
-
-    # Assignments with hours that could not fit, or whose deadline passed.
-    assignments = {a.id: a for a in Assignment.query.join(Course).filter(Course.user_id == user.id)}
-    needs_attention = [
-        {"assignment": assignments[assignment_id], **summary}
-        for assignment_id, summary in summaries.items()
-        if summary["unscheduled"] > 0
-    ]
-    needs_attention.sort(key=lambda item: item["assignment"].due_date)
-
-    # SCRUM-27: completed hours vs estimated hours for each assignment.
-    completed_hours = {}
-    for session in StudySession.query.filter_by(user_id=user.id, completed=True):
-        completed_hours[session.assignment_id] = (
-            completed_hours.get(session.assignment_id, 0.0) + session.duration_hours
-        )
-    progress = []
-    for assignment in sorted(assignments.values(), key=lambda a: a.due_date):
-        done = round(completed_hours.get(assignment.id, 0.0), 2)
-        estimated = assignment.estimated_hours or 0.0
-        percent = min(100, round(done / estimated * 100)) if estimated else 0
-        progress.append({
-            "assignment": assignment,
-            "completed": done,
-            "estimated": estimated,
-            "percent": percent,
-        })
-
-    return render_template(
-        "schedule.html",
-        schedule=sorted(sessions_by_date.items()),
-        needs_attention=needs_attention,
-        progress=progress,
-        today=today,
-    )
 
 
 @app.route("/sessions/<int:session_id>/toggle", methods=["POST"])
@@ -419,13 +393,13 @@ def toggle_session(session_id):
 
 
 app.config["CANVAS_ALLOWED_HOSTS"] = tuple(
-    host.strip().lower() for host in os.environ.get("STUDYFLOW_CANVAS_ALLOWED_HOSTS", "").split(",") if host.strip()
+    host.strip().lower() for host in os.environ.get("STUDYFLOW_CANVAS_ALLOWED_HOSTS", "canvas.txstate.edu").split(",") if host.strip()
 )
 register_canvas(app)
 
 @app.before_request
 def protect_canvas_pages():
-    if request.endpoint in {"connect_canvas", "disconnect_canvas"} and current_user() is None:
+    if request.endpoint in {"connect_canvas", "disconnect_canvas", "import_canvas", "sync_canvas"} and current_user() is None:
         return redirect(url_for("auth.login"))
 
 

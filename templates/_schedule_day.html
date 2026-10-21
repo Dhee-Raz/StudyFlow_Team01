@@ -1,0 +1,32 @@
+{# Reusable day card, included with day and sessions in scope. Each session holds date, duration in hours, and an Assignment object. Jinja dot notation also reads dictionary keys. #}
+<section class="card">
+  <h2>
+    <span class="day-heading">
+      <span class="day-name">{{ day.strftime("%A, %B %d, %Y") }}</span>
+      <span class="day-date">{{ day.strftime("%b %d") }}</span>
+    </span>
+  </h2>
+  <ul class="assignment-list">
+    {% for session in sessions %}
+      {% set canvas_url = canvas_assignment_url(session.assignment) %}
+      <li>
+        <div class="session-item">
+          <span>
+            {% if canvas_url %}
+              <a href="{{ canvas_url }}" target="_blank" rel="noopener noreferrer" class="assignment-title-link">{{ session.assignment.title }}</a>
+            {% else %}
+              <strong>{{ session.assignment.title }}</strong>
+            {% endif %}
+            <span class="meta">
+              {{ session.assignment.course.name if session.assignment.course else "Personal" }}
+              {% if session.assignment.points_possible %}
+                &middot; {{ session.assignment.points_possible|round(0, "floor")|int }} pts
+              {% endif %}
+            </span>
+          </span>
+          <span class="duration-pill">{{ "%.2f"|format(session.duration) }} hours</span>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+</section>

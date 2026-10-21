@@ -26,7 +26,7 @@
         <a href="{{ url_for('schedule') }}" class="{{ 'active' if request.endpoint == 'schedule' }}">Schedule</a>
         <a href="{{ url_for('connect_canvas') }}" class="{{ 'active' if request.endpoint == 'connect_canvas' }}">Connect Canvas</a>
         {% if current_user %}
-        <form method="post" action="{{ url_for('auth.logout') }}" class="auth-logout"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button type="submit">Log out</button></form>
+        <form method="post" action="{{ url_for('auth.logout') }}" class="auth-logout"><input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}"><button type="submit">Log out</button></form>
         {% else %}
         <a href="{{ url_for('auth.login') }}">Log in</a>
         <a href="{{ url_for('auth.register') }}">Register</a>
