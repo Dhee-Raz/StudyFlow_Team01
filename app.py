@@ -372,6 +372,26 @@ def schedule():
 
 
 
+@app.route("/sessions/<int:session_id>/toggle", methods=["POST"])
+@login_required
+def toggle_session(session_id):
+    """Mark a study session complete or incomplete (owner only)."""
+    # Filtering by user_id means other users get a 404, not someone else's session.
+    study_session = StudySession.query.filter_by(
+        id=session_id, user_id=current_user().id
+    ).first_or_404()
+
+    study_session.completed = not study_session.completed
+    study_session.completed_at = datetime.now() if study_session.completed else None
+    db.session.commit()
+
+    if study_session.completed:
+        flash("Nice work! Session marked complete.")
+    else:
+        flash("Session marked incomplete.")
+    return redirect(url_for("schedule"))
+
+
 app.config["CANVAS_ALLOWED_HOSTS"] = tuple(
     host.strip().lower() for host in os.environ.get("STUDYFLOW_CANVAS_ALLOWED_HOSTS", "canvas.txstate.edu").split(",") if host.strip()
 )

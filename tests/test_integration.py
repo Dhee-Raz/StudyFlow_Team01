@@ -105,7 +105,7 @@ def test_course_form_to_database_to_generated_schedule(client, planner):
     assert html.count("<h2>") == 7
 
     # Data remains available on a new request and on the course listing.
-    assert client.get("/schedule").data.count(b"Sprint 1 Report") == 7
+    assert client.get("/schedule").data.count(b"<strong>Sprint 1 Report</strong>") == 7
     listing = client.get("/")
     assert b"Sprint 1 Report" in listing.data
     with planner.app.app_context():
