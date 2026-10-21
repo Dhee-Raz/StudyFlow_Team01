@@ -1,6 +1,6 @@
 """Ticket 10 tests use isolated SQLite and mocked Canvas responses."""
 import importlib
-from datetime import datetime
+from datetime import date, datetime
 from unittest.mock import Mock
 
 import pytest
@@ -17,6 +17,11 @@ def planner(tmp_path, monkeypatch):
     monkeypatch.setenv('STUDYFLOW_DATABASE_URI', f'sqlite:///{tmp_path / "planner.db"}')
     module = importlib.import_module('app')
     module.app.config['TESTING'] = True
+    class FixedDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 10, 19)
+    monkeypatch.setattr(module, 'date', FixedDate)
     with module.app.app_context():
         db.session.remove()
         db.drop_all()
