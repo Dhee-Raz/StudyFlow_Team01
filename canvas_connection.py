@@ -132,6 +132,7 @@ def register_canvas(app):
         flash('Disconnected from Canvas. Your planner data has not changed.')
         return redirect(url_for('connect_canvas'))
 
+    @app.route('/sync-canvas', methods=['POST'], endpoint='sync_canvas')
     @app.route('/import-canvas', methods=['POST'])
     def import_canvas():
         from canvas_import import CanvasImportError, import_courses
@@ -142,19 +143,19 @@ def register_canvas(app):
             return page('Connect to Canvas before importing. Your previous connection may have expired.', 400)
         try:
             from auth import current_user
-            counts = import_courses(record, current_user().id)
+            counts = import_courses(record, current_user().id, sync=request.endpoint == "sync_canvas")
         except CanvasImportError as error:
             return page(str(error), 400)
-        flash(f"Import complete: {counts['courses']} courses added, "
-              f"{counts['assignments']} assignments added, {counts['skipped']} items skipped, "
+        flash(f"{'Sync' if request.endpoint == 'sync_canvas' else 'Import'} complete: {counts['courses']} courses added, "
+              f"{counts['assignments']} assignments added, {counts['updated']} items updated, {counts['skipped']} items skipped, "
               f"{counts['failed']} invalid items failed. "
-              f"{counts['missing_deadlines']} new assignments need a deadline. "
+              f"{counts['missing_deadlines']} assignments need a deadline. {counts['missing']} previously imported assignments were not returned by Canvas and were kept for review. "
               "Imported assignments start with an editable 2-hour study estimate.")
         return redirect(url_for('index'))
 
     @app.after_request
     def protect_canvas_response(response):
-        if request.endpoint in ('connect_canvas', 'disconnect_canvas', 'import_canvas'):
+        if request.endpoint in ('connect_canvas', 'disconnect_canvas', 'import_canvas', 'sync_canvas'):
             response.headers['Cache-Control'] = 'no-store'
             response.headers['Referrer-Policy'] = 'no-referrer'
         return response

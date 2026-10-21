@@ -9,21 +9,21 @@
   <ul class="assignment-list grouped">
     {% for assignment in group.assignments %}
       {% set canvas_url = canvas_assignment_url(assignment) %}
-      <li>
-        {% if canvas_url %}
-          <a href="{{ canvas_url }}" target="_blank" rel="noopener noreferrer" class="assignment-title-link">{{ assignment.title }}</a>
-        {% else %}
-          <strong>{{ assignment.title }}</strong>
-        {% endif %}
-        <span class="meta">
-          {{ assignment.estimated_hours }} hrs
-          {% if assignment.points_possible is not none %}
-            &middot; {{ assignment.points_possible }} points
+      <li class="course-assignment-row">
+        <div class="course-assignment-content">
+          {% if canvas_url %}
+            <a href="{{ canvas_url }}" target="_blank" rel="noopener noreferrer" class="assignment-title-link">{{ assignment.title }}</a>
+          {% else %}
+            <strong>{{ assignment.title }}</strong>
           {% endif %}
-        </span>
-        {% if assignment.canvas_timezone %}<span class="meta">{{ assignment.due_date.strftime('%H:%M') }} ({{ assignment.canvas_timezone }})</span>{% endif %}
-        {% if canvas_url %}<a href="{{ canvas_url }}" target="_blank" rel="noopener noreferrer">Open in Canvas</a>{% endif %}
-        {% if assignment.canvas_key %}<a href="{{ url_for('calendar_view', selected='assignment-' ~ assignment.id) }}">Review deadline and study hours</a>{% endif %}
+          {% if assignment.canvas_missing %}<span class="meta">Not returned by Canvas — check source</span>{% endif %}
+          <div class="course-assignment-details">
+            <span>{{ '%g'|format(assignment.estimated_hours) }} hrs study</span>
+            {% if assignment.points_possible is not none %}<span>{{ '%g'|format(assignment.points_possible) }} points</span>{% endif %}
+            {% if assignment.canvas_timezone %}<span>Due {{ assignment.due_date.strftime('%I:%M %p').lstrip('0') }}</span>{% endif %}
+          </div>
+        </div>
+        <a class="assignment-edit" href="{{ url_for('calendar_view', selected='assignment-' ~ assignment.id) }}" aria-label="Edit {{ assignment.title }}">Edit</a>
       </li>
     {% endfor %}
   </ul>

@@ -17,6 +17,12 @@
       <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
       <button class="btn btn-primary" type="submit">Import Courses and Assignments</button>
     </form>
+    <form method="post" action="{{ url_for('sync_canvas') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+      <button class="btn btn-secondary" type="submit">Sync Canvas</button>
+    </form>
+    <p>Sync adds new assignments and updates Canvas titles, deadlines, and points. Your study-hour estimates stay unchanged. Changed deadlines affect future study plans; assignments no longer returned by Canvas are kept for review.</p>
     <p>Imported assignments start with a 2-hour study estimate. Adjust it in Calendar. Missing deadlines are marked for review.</p>
     <form method="post" action="{{ url_for('disconnect_canvas') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

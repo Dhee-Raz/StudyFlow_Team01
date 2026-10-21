@@ -49,6 +49,7 @@ class Assignment(db.Model):
         return bool(re.search(r"exam|mid[\s_-]?term", self.title, re.IGNORECASE))
 
     canvas_key = db.Column(db.String(650), nullable=True)
+    canvas_missing = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     canvas_url = db.Column(db.String(600), nullable=True)
     canvas_timezone = db.Column(db.String(100), nullable=True)
     points_possible = db.Column(db.Float, nullable=True)

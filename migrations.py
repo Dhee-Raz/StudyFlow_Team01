@@ -11,7 +11,7 @@ def upgrade_canvas_import(engine):
         try:
             additions = {
                 'course': {'canvas_key': 'VARCHAR(600)'},
-                'assignment': {'canvas_key': 'VARCHAR(650)', 'canvas_url': 'VARCHAR(600)',
+                'assignment': {'canvas_missing': 'BOOLEAN NOT NULL DEFAULT 0', 'canvas_key': 'VARCHAR(650)', 'canvas_url': 'VARCHAR(600)',
                                'canvas_timezone': 'VARCHAR(100)', 'points_possible': 'FLOAT'},
             }
             for table, fields in additions.items():

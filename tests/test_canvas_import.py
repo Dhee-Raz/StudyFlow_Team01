@@ -88,7 +88,7 @@ def test_import_timezone_points_links_and_duplicates(planner, record, http):
             state['_csrf_token'] = 'test-csrf'
 
         html = client.get('/').data
-        assert b'100.0 points' in html and b'Open in Canvas' in html
+        assert b'100 points' in html and b'assignment-title-link' in html
         assert b'private-test-token' not in html
 
 
@@ -274,3 +274,92 @@ def test_personalized_heading_and_authenticated_import_form(planner, record):
     assert response.status_code == 200
     assert b'Import Courses and Assignments' in response.data
     assert b'private-test-token' not in response.data
+
+
+def test_sync_updates_source_fields_preserves_hours_ids_and_linked_progress(planner, record, http):
+    http.get.side_effect = [response([course()]), response([assignment()])]
+    import_courses(record, 1)
+    item = Assignment.query.one()
+    saved_id = item.id
+    item.estimated_hours = 7
+    db.session.commit()
+    db.session.execute(text('CREATE TABLE sync_test_progress (id INTEGER PRIMARY KEY, assignment_id INTEGER REFERENCES assignment(id), completed BOOLEAN, hours FLOAT)'))
+    db.session.execute(text('INSERT INTO sync_test_progress VALUES (1, :aid, 1, 1.5)'), {'aid': saved_id})
+    db.session.commit()
+    changed = assignment()
+    changed.update(name='Updated essay', due_at='2026-11-03T05:59:00Z', points_possible=80)
+    changed_course = course(); changed_course['name'] = 'Updated course'
+    try:
+        http.get.side_effect = [response([changed_course]), response([changed, assignment(11)])]
+        counts = import_courses(record, 1, sync=True)
+        assert counts['updated'] == 2 and counts['assignments'] == 1
+        assert item.id == saved_id and item.estimated_hours == 7
+        assert item.title == 'Updated essay' and item.points_possible == 80
+        assert item.due_date == datetime(2026, 11, 2, 23, 59)
+        assert db.session.execute(text('SELECT assignment_id, completed, hours FROM sync_test_progress')).one() == (saved_id, 1, 1.5)
+        http.get.side_effect = [response([changed_course]), response([changed, assignment(11)])]
+        assert import_courses(record, 1, sync=True)['updated'] == 0
+    finally:
+        db.session.execute(text('DROP TABLE sync_test_progress')); db.session.commit()
+
+
+def test_sync_missing_and_returning_events_are_retained(planner, record, http):
+    http.get.side_effect = [response([course()]), response([assignment()])]
+    import_courses(record, 1)
+    item = Assignment.query.one()
+    http.get.side_effect = [response([])]
+    counts = import_courses(record, 1, sync=True)
+    assert counts['missing'] == 1 and item.canvas_missing
+    assert Assignment.query.count() == 1
+    http.get.side_effect = [response([course()]), response([assignment()])]
+    assert import_courses(record, 1, sync=True)['updated'] == 1
+    assert not item.canvas_missing
+
+
+def test_sync_failure_and_invalid_items_do_not_mark_missing(planner, record, http):
+    http.get.side_effect = [response([course()]), response([assignment()])]
+    import_courses(record, 1)
+    item = Assignment.query.one()
+    original_date = item.due_date
+    http.get.side_effect = [response([course()]), requests.Timeout('private-test-token')]
+    with pytest.raises(CanvasImportError):
+        import_courses(record, 1, sync=True)
+    assert item.due_date == original_date and not item.canvas_missing
+    http.get.side_effect = [response([course()]), response([{'id': 10, 'name': 'Bad', 'due_at': 'bad-date'}])]
+    assert import_courses(record, 1, sync=True)['failed'] == 1
+    assert not item.canvas_missing and item.title == 'Canvas Essay'
+
+
+def test_sync_is_scoped_to_logged_in_user_and_canvas_account(planner, record, http):
+    db.session.add(User(id=2, email='sync-other@example.edu', password_hash='test-only')); db.session.commit()
+    http.get.side_effect = [response([course()]), response([assignment()])] * 2
+    import_courses(record, 1); import_courses(record, 2)
+    changed = assignment(); changed['name'] = 'Only user one'
+    http.get.side_effect = [response([course()]), response([changed])]
+    import_courses(record, 1, sync=True)
+    assert Assignment.query.join(Course).filter(Course.user_id == 2).one().title == 'Canvas Essay'
+    record['profile']['id'] = 99
+    http.get.side_effect = [response([])]
+    import_courses(record, 1, sync=True)
+    assert not any(a.canvas_missing for a in Assignment.query.all())
+
+
+def test_sync_route_and_missing_deadline(planner, record, http):
+    with planner.test_client() as client:
+        with client.session_transaction() as state:
+            state['user_id'] = 1
+            state['_csrf_token'] = 'test-csrf'
+        client.get('/connect-canvas')
+        with client.session_transaction() as state:
+            csrf = state['canvas_csrf']
+            state['canvas_connection'] = planner.extensions['canvas_connections'].save(None, record['url'], record['token'], dict(record['profile'], name='Student'))
+        assert client.post('/sync-canvas', data={'_csrf_token': 'test-csrf'}).status_code == 400
+        http.get.side_effect = [response([course()]), response([assignment()])]
+        result = client.post('/sync-canvas', data={'_csrf_token': 'test-csrf', 'csrf_token': csrf}, follow_redirects=True)
+        assert b'Sync complete' in result.data
+        changed = assignment(); changed['due_at'] = None
+        http.get.side_effect = [response([course()]), response([changed])]
+        result = client.post('/sync-canvas', data={'_csrf_token': 'test-csrf', 'csrf_token': csrf}, follow_redirects=True)
+        assert b'1 items updated' in result.data and b'No deadline' in result.data
+        assert client.get('/schedule').status_code == 200
+        assert Assignment.query.one().estimated_hours == 2

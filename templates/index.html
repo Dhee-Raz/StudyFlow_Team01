@@ -55,10 +55,20 @@
               {% endif %}
 
               {% if entry.undated %}
-                <h3>No deadline — needs review</h3>
-                {% for assignment in entry.undated %}
-                  <p>{{ assignment.title }} <a href="{{ url_for('calendar_view', selected='assignment-' ~ assignment.id) }}">Review deadline and study hours</a></p>
-                {% endfor %}
+                <details class="more-groups undated-assignments">
+                  <summary>{{ entry.undated|length }} without a deadline — needs review</summary>
+                  <ul class="assignment-list grouped">
+                    {% for assignment in entry.undated %}
+                      <li class="course-assignment-row">
+                        <div class="course-assignment-content">
+                          {% if assignment.canvas_url %}<a class="assignment-title-link" href="{{ assignment.canvas_url }}" target="_blank" rel="noopener noreferrer">{{ assignment.title }}</a>{% else %}<strong>{{ assignment.title }}</strong>{% endif %}
+                          <span class="meta">No deadline — needs review{% if assignment.canvas_missing %} · Not returned by Canvas{% endif %}</span>
+                        </div>
+                        <a class="assignment-edit" href="{{ url_for('calendar_view', selected='assignment-' ~ assignment.id) }}" aria-label="Edit {{ assignment.title }}">Edit</a>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </details>
               {% endif %}
               {% if entry.past %}
                 <details class="past-assignments">
@@ -72,6 +82,7 @@
                         {% else %}
                           <strong>{{ assignment.title }}</strong>
                         {% endif %}
+                        {% if assignment.canvas_missing %}<span class="meta">Not returned by Canvas — check source</span>{% endif %}
                         <span class="meta">Was due {{ assignment.due_date.strftime("%a, %b %d %Y") }}</span>
                       </li>
                     {% endfor %}

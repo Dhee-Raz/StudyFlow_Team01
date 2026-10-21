@@ -374,7 +374,7 @@ register_canvas(app)
 
 @app.before_request
 def protect_canvas_pages():
-    if request.endpoint in {"connect_canvas", "disconnect_canvas", "import_canvas"} and current_user() is None:
+    if request.endpoint in {"connect_canvas", "disconnect_canvas", "import_canvas", "sync_canvas"} and current_user() is None:
         return redirect(url_for("auth.login"))
 
 

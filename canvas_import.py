@@ -1,4 +1,4 @@
-"""Ticket 10: initial Canvas import. Existing imported records are never refreshed."""
+"""Canvas import and manual sync; update source fields without replacing planner records."""
 from datetime import datetime
 import math
 from urllib.parse import urlsplit, urljoin
@@ -59,7 +59,7 @@ def deadline(value, zone):
     return parsed.astimezone(ZoneInfo(zone)).replace(tzinfo=None)
 
 
-def import_courses(record, owner_id):
+def import_courses(record, owner_id, *, sync=False):
     base_url = record['url']
     account = numeric_id(record['profile']['id'])
     prefix = f'{owner_id}|{base_url}|{account}|'
@@ -68,7 +68,7 @@ def import_courses(record, owner_id):
         ZoneInfo(zone)
     except (ZoneInfoNotFoundError, ValueError):
         zone = 'UTC'
-    counts = dict(courses=0, assignments=0, skipped=0, failed=0, missing_deadlines=0)
+    counts = dict(courses=0, assignments=0, skipped=0, failed=0, missing_deadlines=0, updated=0, missing=0)
     courses = {}
     # Fetch everything before writing: a failed page must not leave a partial import.
     try:
@@ -119,6 +119,7 @@ def import_courses(record, owner_id):
         raise CanvasImportError('Could not read Canvas securely. Your planner has not changed; try again.') from None
 
     try:
+        seen_keys = set()
         for cid, (name, items) in courses.items():
             course_key = prefix + str(cid)
             course = Course.query.filter_by(canvas_key=course_key).first()
@@ -126,16 +127,36 @@ def import_courses(record, owner_id):
                 course = Course(name=name, canvas_key=course_key, user_id=owner_id)
                 db.session.add(course)
                 counts['courses'] += 1
+            elif sync and course.name != name:
+                course.name = name
+                counts['updated'] += 1
             else:
                 counts['skipped'] += 1
             for aid, values in items.items():
                 key = course_key + '|' + str(aid)
-                if Assignment.query.filter_by(canvas_key=key).first() is not None:
-                    counts['skipped'] += 1
+                seen_keys.add(key)
+                existing = Assignment.query.filter_by(canvas_key=key).first()
+                if existing is not None:
+                    if sync:
+                        changed = existing.canvas_missing or any(getattr(existing, field) != value for field, value in values.items())
+                        for field, value in values.items():
+                            setattr(existing, field, value)
+                        existing.canvas_missing = False
+                        counts['updated' if changed else 'skipped'] += 1
+                        counts['missing_deadlines'] += existing.due_date is None
+                    else:
+                        counts['skipped'] += 1
                     continue
                 db.session.add(Assignment(course=course, canvas_key=key, estimated_hours=2, **values))
                 counts['assignments'] += 1
                 counts['missing_deadlines'] += values['due_date'] is None
+        if sync and not counts['failed']:
+            # Never infer deletions from a partial/invalid response, or delete records.
+            owned = Assignment.query.join(Course).filter(Course.user_id == owner_id).all()
+            for existing in owned:
+                if existing.canvas_key and existing.canvas_key.startswith(prefix) and existing.canvas_key not in seen_keys:
+                    existing.canvas_missing = True
+                    counts['missing'] += 1
         db.session.commit()
     except SQLAlchemyError:
         db.session.rollback()

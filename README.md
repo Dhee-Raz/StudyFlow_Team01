@@ -67,8 +67,8 @@ token, and select **Verify and Connect**. Create a token in Canvas under
 **Account → Settings → Approved Integrations → New Access Token**. School policy
 may disable personal tokens. Use a short expiration and never share the token.
 
-This ticket only verifies `GET /api/v1/users/self/profile`; it does not import or
-modify courses, assignments, or schedules. API reference:
+Connection verification uses `GET /api/v1/users/self/profile`. The import and sync
+buttons added in Tickets 10–11 fetch courses and assignments separately. API reference:
 https://developerdocs.instructure.com/services/canvas/resources/users
 
 Security and current scope:
@@ -109,7 +109,7 @@ added, skipped items, invalid items, and assignments needing a deadline.
   Calendar. Scheduling starts only after a deadline and positive estimate exist.
 - Duplicate keys include Canvas host, Canvas account ID, course ID, and assignment ID.
   Reimporting skips existing records and preserves their local edits and hours.
-  Refreshing changed deadlines and syncing are **Ticket 11**, not implemented here.
+  Use **Sync Canvas** to refresh existing source fields (Ticket 11).
 - All API pages are fetched before saving. HTTP/parse/pagination failures save nothing;
   a database save failure rolls back the whole import. Malformed individual items are
   counted as failed while valid items can be imported. Individual fields longer than
@@ -251,3 +251,42 @@ Sprint 2 user migration instructions below/above. That migration intentionally
 rejects custom schemas: if you already ran an earlier Ticket 10 preview on your
 legacy database, preserve it and use a fresh database for this branch rather than
 forcing the migration. Do not delete your existing database.
+
+## Ticket 11 — Manual Canvas sync
+
+After connecting, select **Sync Canvas** to add new courses/assignments and update
+existing Canvas titles, deadlines, points, and source links. Initial Import continues
+to skip existing records. Both operations report added, updated, skipped, and failed
+counts. Updated counts include renamed courses and changed assignments.
+
+Sync never replaces assignment rows or changes study-hour estimates. It does not
+write to or delete linked study-session/completion records. The saved-session and
+completion UI is still on teammates' unmerged branches; this release tests that
+linked completed-progress records survive sync, not that those unmerged features
+are already available. Future computed schedules reflect changed deadlines.
+
+Assignments no longer returned in a complete successful response are retained and
+marked **Not returned by Canvas — check source**. Reappearing assignments clear
+that flag. Invalid records disable missing-event inference for that sync, and a
+network/database failure retains existing planner data. A missing deadline is
+kept for review and excluded from scheduling. No automatic deletion occurs.
+
+All imports/syncs are scoped to the signed-in StudyFlow user and connected Canvas
+account. POST actions require both app and Canvas form CSRF tokens. The existing
+connection timeout, trusted hosts, HTTPS/no-redirect behavior, and token privacy
+remain unchanged. SQLite startup migration adds a default-false `canvas_missing`
+column to existing assignments. Back up databases before upgrading.
+
+### Import-to-schedule demo
+1. Register/sign in and verify a Canvas token on Connect Canvas.
+2. Import courses/assignments, inspect grouped course deadlines, and open Schedule.
+3. Edit one imported assignment's study hours via its **Edit** link.
+4. After a real Canvas title/deadline change, use **Sync Canvas**.
+5. Verify the source changes appear while your hours remain, and repeat Sync to
+   verify no duplicates. Disconnect and confirm planner data remains available.
+
+Automated tests simulate these updates, timezone/DST conversion, missing/reappearing
+assignments, invalid data, network failures, duplicate syncs, ownership, and linked
+completed progress. A real-token smoke test remains for teammates; tests never use
+personal tokens. The pending UI cleanup is included: readable title/details rows,
+compact Edit links, styled logout button, and no visible timezone labels.
