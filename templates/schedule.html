@@ -11,7 +11,7 @@
     <div class="card-body">
       <h3>Your Study Progress</h3>
       {% for entry in progress %}
-      <p><strong>{{ entry.title }}</strong>: {{ "%.2f"|format(entry.done) }} of {{ "%.2f"|format(entry.total) }} hrs completed ({{ entry.percent }}%)</p>
+      <p><span class="progress-title">{{ entry.title }}</span>: {{ "%.2f"|format(entry.done) }} of {{ "%.2f"|format(entry.total) }} hrs completed ({{ entry.percent }}%)</p>
       {% endfor %}
     </div>
   </section>
