@@ -6,6 +6,22 @@
     <h1>Study Schedule</h1>
     <p>Your upcoming sessions, spread out day by day. <a href="{{ url_for('study_availability') }}">Change availability</a></p>
   </div>
+  {% if unscheduled %}
+  <section class="card" role="status" aria-label="Study capacity warning">
+    <div class="card-body">
+      <h2>Not enough available study time</h2>
+      <p>Your selected study days and daily limit cannot fit all work before the deadlines.
+         Change your availability or review your assignment estimates.</p>
+      <ul>
+        {% for item in unscheduled %}
+        <li>{{ item.title }}: {{ "%.2f"|format(item.hours) }} hours not scheduled before the deadline</li>
+        {% endfor %}
+      </ul>
+      <a href="{{ url_for('study_availability') }}">Update study availability</a>
+    </div>
+  </section>
+  {% endif %}
+
   {% if progress %}
   <section class="card">
     <div class="card-body">
