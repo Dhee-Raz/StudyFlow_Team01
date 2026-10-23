@@ -290,3 +290,31 @@ assignments, invalid data, network failures, duplicate syncs, ownership, and lin
 completed progress. A real-token smoke test remains for teammates; tests never use
 personal tokens. The pending UI cleanup is included: readable title/details rows,
 compact Edit links, styled logout button, and no visible timezone labels.
+
+
+## Sprint 2 Ticket 4 — Study availability settings
+
+Sign in and choose **Availability** in the navigation (or open `/availability`).
+Select one or more weekdays and set a maximum number of study hours per day
+(above 0 and no more than 24). Defaults are all seven weekdays and four
+hours per day. Settings are stored on the authenticated User record and
+survive logout/login. Another account cannot access or change your settings.
+
+When a student changes those defaults, the Schedule page regenerates that
+student's **persistent** study sessions using `plan_sessions()` and the saved
+weekday/limit preferences. Earlier deadlines receive priority and the planner
+reports work that will not fit before a deadline through its scheduling
+summaries. Completed sessions are retained on regeneration. Assignments without
+deadlines remain available for review but cannot be scheduled.
+
+The new columns (`available_weekdays`, `daily_study_hours`) are added to
+existing SQLite User tables at application startup using an idempotent,
+transactional migration. Back up existing local databases before pulling new
+schema changes, and do not publish database files.
+
+Run tests using:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+```
