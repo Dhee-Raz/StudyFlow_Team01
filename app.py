@@ -411,18 +411,15 @@ def study_availability():
 def schedule():
     user = current_user()
     assignments = Assignment.query.join(Course).filter(Course.user_id == user.id).all()
-    custom = (user.available_weekdays != "0,1,2,3,4,5,6"
-              or user.daily_study_hours != 4.0)
-    if custom:
-        weekdays = {int(day) for day in user.available_weekdays.split(",")}
-        refresh_saved_sessions(db, user.id, date.today(),
-                               daily_capacity=user.daily_study_hours,
-                               available_weekdays=weekdays)
-        saved = StudySession.query.filter_by(user_id=user.id).all()
-        return render_template("schedule.html",
-                               **schedule_sections(assignments, date.today(),
-                                                   saved_sessions=saved))
-    return render_template("schedule.html", **schedule_sections(assignments, date.today()))
+    weekdays = {int(day) for day in user.available_weekdays.split(",")}
+    refresh_saved_sessions(db, user.id, date.today(),
+                           daily_capacity=user.daily_study_hours,
+                           available_weekdays=weekdays)
+    saved = StudySession.query.filter_by(user_id=user.id).all()
+    # Show persistent sessions so completion and progress do not disappear.
+    return render_template("schedule.html",
+                           **schedule_sections(assignments, date.today(),
+                                               saved_sessions=saved))
 
 
 
