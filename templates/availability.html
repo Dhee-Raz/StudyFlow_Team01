@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Study Availability - StudyFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Study Availability</h1>
+  <p>Choose the days you can study and the maximum hours you want to study per day.</p>
+</div>
+<div class="form-card">
+  <form method="post" action="{{ url_for('study_availability') }}" class="form">
+    <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+    <fieldset>
+      <legend>Available study days</legend>
+      {% for day_id, day_name in weekdays %}
+      <label style="display:block; margin: 0.6rem 0;">
+        <input type="checkbox" name="weekdays" value="{{ day_id }}" {% if day_id in selected %}checked{% endif %}>
+        {{ day_name }}
+      </label>
+      {% endfor %}
+    </fieldset>
+    <label for="daily_study_hours">Maximum study hours per day</label>
+    <input id="daily_study_hours" name="daily_study_hours" type="number"
+           min="0.25" max="24" step="0.25" value="{{ hours }}" required>
+    <p>Study sessions are scheduled on your selected days. Earlier deadlines get priority.
+       Sessions that do not fit are left unscheduled, rather than exceeding your limit.</p>
+    <button type="submit">Save availability</button>
+  </form>
+</div>
+{% endblock %}
