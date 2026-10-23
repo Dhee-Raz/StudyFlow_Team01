@@ -412,14 +412,24 @@ def schedule():
     user = current_user()
     assignments = Assignment.query.join(Course).filter(Course.user_id == user.id).all()
     weekdays = {int(day) for day in user.available_weekdays.split(",")}
-    refresh_saved_sessions(db, user.id, date.today(),
-                           daily_capacity=user.daily_study_hours,
-                           available_weekdays=weekdays)
-    saved = StudySession.query.filter_by(user_id=user.id).all()
-    # Show persistent sessions so completion and progress do not disappear.
-    return render_template("schedule.html",
-                           **schedule_sections(assignments, date.today(),
-                                               saved_sessions=saved))
+    summaries = refresh_saved_sessions(
+        db, user.id, date.today(),
+        daily_capacity=user.daily_study_hours,
+        available_weekdays=weekdays,
+    )
+    saved = (StudySession.query.filter_by(user_id=user.id)
+             .order_by(StudySession.session_date, StudySession.id).all())
+    # Keep the user's completed sessions and display capacity shortfalls explicitly.
+    unscheduled = [
+        {"title": assignment.title, "hours": summaries[assignment.id]["unscheduled"]}
+        for assignment in assignments
+        if assignment.id in summaries and summaries[assignment.id]["unscheduled"] > 0
+    ]
+    return render_template(
+        "schedule.html",
+        unscheduled=unscheduled,
+        **schedule_sections(assignments, date.today(), saved_sessions=saved),
+    )
 
 
 
