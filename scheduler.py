@@ -115,7 +115,10 @@ def plan_sessions(assignments, today, daily_capacity=DEFAULT_DAILY_CAPACITY_HOUR
     plan = {}
     summaries = {}
 
-    ordered = sorted(assignments, key=lambda a: (a.due_date, a.id))
+    # Canvas can import assignments without deadlines; keep those for review,
+    # but do not attempt to schedule them until the student sets a date.
+    ordered = sorted((a for a in assignments if a.due_date is not None),
+                     key=lambda a: (a.due_date, a.id))
     for assignment in ordered:
         done = completed_hours_by_assignment.get(assignment.id, 0.0)
         remaining = max(0.0, (assignment.estimated_hours or 0.0) - done)
