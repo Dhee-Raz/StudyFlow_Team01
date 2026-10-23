@@ -33,11 +33,26 @@ def schedule_sections(assignments, today, saved_sessions=None):
                     "duration": item.duration_hours,
                     "assignment": item.assignment,
                     "completed": item.completed,
+                    "id": item.id,
                 })
         days = [(day, sorted(grouped[day], key=lambda row: row["assignment"].due_date or today))
                 for day in sorted(grouped)]
+        # Progress totals count only completed persisted sessions and are scoped
+        # to the assignments supplied by the authenticated caller.
+        completed = {}
+        for item in saved_sessions:
+            if item.completed:
+                completed[item.assignment_id] = (completed.get(item.assignment_id, 0.0)
+                                                  + item.duration_hours)
+        progress = []
+        for assignment in assignments:
+            done = completed.get(assignment.id, 0.0)
+            total = assignment.estimated_hours or 0
+            percent = round(min(100, done / total * 100)) if total > 0 else 100
+            progress.append({"title": assignment.title, "done": done,
+                             "total": total, "percent": percent})
         cutoff = today + timedelta(days=30)
-        return dict(visible_days=[entry for entry in days if entry[0] <= cutoff],
+        return dict(progress=progress, visible_days=[entry for entry in days if entry[0] <= cutoff],
                     extra_days=[entry for entry in days if entry[0] > cutoff],
                     due_today=due_today,
                     exams=[dict(assignment=a, days_until=(a.due_date.date() - today).days)
