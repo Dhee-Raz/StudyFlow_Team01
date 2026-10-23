@@ -13,7 +13,7 @@ from canvas_connection import register_canvas
 def site(monkeypatch):
     app = Flask(__name__, template_folder=str(Path(__file__).resolve().parents[1] / 'templates'))
     app.config.update(TESTING=True, SECRET_KEY='test-secret')
-    for endpoint in ('index', 'add_course', 'add_assignment', 'calendar_view', 'schedule'):
+    for endpoint in ('index', 'add_course', 'add_assignment', 'calendar_view', 'schedule', 'study_availability'):
         app.add_url_rule('/' + endpoint, endpoint, lambda: '')
     auth = Blueprint('auth', __name__)
     auth.add_url_rule('/login', endpoint='login', view_func=lambda: '')
