@@ -25,6 +25,12 @@
             </span>
           </span>
           <span class="duration-pill">{{ "%.2f"|format(session.duration) }} hours</span>
+          {% if session.id is defined %}
+          <form method="post" action="{{ url_for('toggle_session', session_id=session.id) }}">
+            <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+            <button type="submit" class="btn btn-secondary">{{ "Completed" if session.completed else "Upcoming" }}</button>
+          </form>
+          {% endif %}
         </div>
       </li>
     {% endfor %}
