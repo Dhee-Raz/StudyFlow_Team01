@@ -79,7 +79,8 @@ def _study_days(today, due_day):
 
 
 def plan_sessions(assignments, today, daily_capacity=DEFAULT_DAILY_CAPACITY_HOURS,
-                  completed_hours_by_assignment=None, completed_hours_by_day=None):
+                  completed_hours_by_assignment=None, completed_hours_by_day=None,
+                  available_weekdays=None):
     """Plan study hours across days without going over the daily capacity.
 
     Pure function (no database), so it is easy to test.
@@ -92,6 +93,14 @@ def plan_sessions(assignments, today, daily_capacity=DEFAULT_DAILY_CAPACITY_HOUR
       plan       -> {(assignment_id, day): hours}
       summaries  -> {assignment_id: {"remaining", "scheduled", "unscheduled", "status"}}
     """
+    if available_weekdays is None:
+        available_weekdays = set(range(7))
+    else:
+        available_weekdays = set(available_weekdays)
+    if not available_weekdays or not available_weekdays.issubset(set(range(7))):
+        raise ValueError("Select at least one valid weekday.")
+    if not (0 < daily_capacity <= 24):
+        raise ValueError("Daily study hours must be between 0 and 24.")
     completed_hours_by_assignment = completed_hours_by_assignment or {}
     completed_hours_by_day = completed_hours_by_day or {}
 
@@ -106,7 +115,10 @@ def plan_sessions(assignments, today, daily_capacity=DEFAULT_DAILY_CAPACITY_HOUR
     plan = {}
     summaries = {}
 
-    ordered = sorted(assignments, key=lambda a: (a.due_date, a.id))
+    # Canvas can import assignments without deadlines; keep those for review,
+    # but do not attempt to schedule them until the student sets a date.
+    ordered = sorted((a for a in assignments if a.due_date is not None),
+                     key=lambda a: (a.due_date, a.id))
     for assignment in ordered:
         done = completed_hours_by_assignment.get(assignment.id, 0.0)
         remaining = max(0.0, (assignment.estimated_hours or 0.0) - done)
@@ -125,7 +137,7 @@ def plan_sessions(assignments, today, daily_capacity=DEFAULT_DAILY_CAPACITY_HOUR
         # Spread hours evenly over the open days ("water filling"):
         # give each day an equal share, and if a day is full, the
         # leftover is shared by the other days.
-        open_days = [day for day in _study_days(today, _due_day(assignment)) if free(day) > _EPSILON]
+        open_days = [day for day in _study_days(today, _due_day(assignment)) if day.weekday() in available_weekdays and free(day) > _EPSILON]
         to_place = remaining
         while to_place > _EPSILON and open_days:
             share = to_place / len(open_days)
@@ -148,7 +160,8 @@ def plan_sessions(assignments, today, daily_capacity=DEFAULT_DAILY_CAPACITY_HOUR
     return plan, summaries
 
 
-def refresh_saved_sessions(db, user_id, today, daily_capacity=DEFAULT_DAILY_CAPACITY_HOURS):
+def refresh_saved_sessions(db, user_id, today, daily_capacity=DEFAULT_DAILY_CAPACITY_HOURS,
+                           available_weekdays=None):
     """Rebuild a user's saved StudySession rows from their assignments.
 
     Safe to run as often as you like:
@@ -176,7 +189,8 @@ def refresh_saved_sessions(db, user_id, today, daily_capacity=DEFAULT_DAILY_CAPA
             )
 
     plan, summaries = plan_sessions(
-        assignments, today, daily_capacity, completed_by_assignment, completed_by_day
+        assignments, today, daily_capacity, completed_by_assignment, completed_by_day,
+        available_weekdays=available_weekdays
     )
 
     existing = {}

@@ -7,11 +7,11 @@ from flask import Flask, flash, redirect, render_template, request, url_for
 from auth import auth, current_user, login_required
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from models import db, Course, Assignment, PersonalTask
-from scheduler import generate_study_sessions
+from models import db, Course, Assignment, PersonalTask, StudySession
+from scheduler import generate_study_sessions, refresh_saved_sessions
 from presentation import course_groups, schedule_sections
 from canvas_connection import register_canvas
-from migrations import upgrade_canvas_import
+from migrations import upgrade_canvas_import, upgrade_study_availability
 
 @event.listens_for(Engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
@@ -29,6 +29,7 @@ app.register_blueprint(auth)
 with app.app_context():
     db.create_all()
     upgrade_canvas_import(db.engine)
+    upgrade_study_availability(db.engine)
 
 
 @app.context_processor
@@ -364,11 +365,61 @@ def delete_calendar_assignment(assignment_id):
     return _calendar_redirect(year, month)
 
 
+@app.route("/availability", methods=["GET", "POST"])
+@login_required
+def study_availability():
+    """Student-specific study weekdays and daily capacity (Ticket 4)."""
+    user = current_user()
+    weekday_names = ("Monday", "Tuesday", "Wednesday", "Thursday",
+                     "Friday", "Saturday", "Sunday")
+    chosen = {int(day) for day in user.available_weekdays.split(",")}
+    hours = user.daily_study_hours
+    if request.method == "POST":
+        raw_days = request.form.getlist("weekdays")
+        try:
+            submitted_days = {int(day) for day in raw_days}
+        except ValueError:
+            submitted_days = set()
+        submitted_hours = request.form.get("daily_study_hours", "").strip()
+        try:
+            parsed_hours = float(submitted_hours)
+        except ValueError:
+            parsed_hours = None
+        errors = []
+        if not raw_days or len(raw_days) != len(submitted_days) or not submitted_days.issubset(set(range(7))):
+            errors.append("Select one or more valid weekdays.")
+        if parsed_hours is None or not math.isfinite(parsed_hours) or not (0 < parsed_hours <= 24):
+            errors.append("Enter a daily study limit greater than zero and at most 24 hours.")
+        if errors:
+            for error in errors:
+                flash(error)
+            return render_template("availability.html",
+                                   weekdays=enumerate(weekday_names),
+                                   selected=submitted_days,
+                                   hours=submitted_hours), 400
+        user.available_weekdays = ",".join(str(day) for day in sorted(submitted_days))
+        user.daily_study_hours = parsed_hours
+        db.session.commit()
+        flash("Study availability saved.")
+        return redirect(url_for("study_availability"))
+    return render_template("availability.html", weekdays=enumerate(weekday_names),
+                           selected=chosen, hours=hours)
+
+
 @app.route("/schedule")
 @login_required
 def schedule():
-    assignments = Assignment.query.join(Course).filter(Course.user_id == current_user().id).all()
-    return render_template("schedule.html", **schedule_sections(assignments, date.today()))
+    user = current_user()
+    assignments = Assignment.query.join(Course).filter(Course.user_id == user.id).all()
+    weekdays = {int(day) for day in user.available_weekdays.split(",")}
+    refresh_saved_sessions(db, user.id, date.today(),
+                           daily_capacity=user.daily_study_hours,
+                           available_weekdays=weekdays)
+    saved = StudySession.query.filter_by(user_id=user.id).all()
+    # Show persistent sessions so completion and progress do not disappear.
+    return render_template("schedule.html",
+                           **schedule_sections(assignments, date.today(),
+                                               saved_sessions=saved))
 
 
 

@@ -4,8 +4,18 @@
 {% block content %}
   <div class="page-header">
     <h1>Study Schedule</h1>
-    <p>Your upcoming sessions, spread out day by day.</p>
+    <p>Your upcoming sessions, spread out day by day. <a href="{{ url_for('study_availability') }}">Change availability</a></p>
   </div>
+  {% if progress %}
+  <section class="card">
+    <div class="card-body">
+      <h3>Your Study Progress</h3>
+      {% for entry in progress %}
+      <p><span class="progress-title">{{ entry.title }}</span>: {{ "%.2f"|format(entry.done) }} of {{ "%.2f"|format(entry.total) }} hrs completed ({{ entry.percent }}%)</p>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 
   {% if due_today %}
   <section class="card today-card">
