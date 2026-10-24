@@ -64,7 +64,10 @@ DEFAULT_DAILY_CAPACITY_HOURS = 4.0
 _EPSILON = 0.01  # ignore leftover fractions smaller than ~36 seconds
 
 
+
 def _due_day(assignment):
+    if assignment.due_date is None:
+        return None
     return assignment.due_date.date()
 
 
@@ -116,7 +119,7 @@ def plan_sessions(assignments, today, daily_capacity=DEFAULT_DAILY_CAPACITY_HOUR
         if remaining < _EPSILON:
             summary["status"] = "done"
             continue
-        if _due_day(assignment) < today:
+        if _due_day(assignment) is None or _due_day(assignment) < today:
             summary["status"] = "overdue"
             summary["unscheduled"] = round(remaining, 2)
             continue

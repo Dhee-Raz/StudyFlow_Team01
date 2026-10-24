@@ -1102,3 +1102,16 @@ h1 {
   .course-assignment-details { gap: 0.25rem 0.7rem; }
   .course-card .card-header { flex-wrap: wrap; gap: 0.75rem; }
 }
+.complete-btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.complete-btn:hover {
+    background-color: #218838;
+}

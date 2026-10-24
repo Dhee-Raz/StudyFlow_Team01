@@ -25,6 +25,32 @@
             </span>
           </span>
           <span class="duration-pill">{{ "%.2f"|format(session.duration) }} hours</span>
+          <small>
+    Session ID: {{ session.id | default('MISSING') }}
+</small>
+          {% if session.id is defined and session.id is not none %}
+<form action="{{ url_for('toggle_session', session_id=session.id) }}" method="POST">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+    <button type="submit" class="complete-btn">
+        
+{% if session.completed %}
+    ✓ Completed
+{% else %}
+    Mark Complete
+{% endif %}
+</button>
+<span class="session-status">
+    {% if session.completed %}
+        Completed
+    {% else %}
+        Upcoming
+    {% endif %}
+</span>
+</form>
+
+ 
+{% endif %}
         </div>
       </li>
     {% endfor %}

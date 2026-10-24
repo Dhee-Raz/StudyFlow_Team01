@@ -102,7 +102,7 @@ def test_course_form_to_database_to_generated_schedule(client, planner):
     ]
     positions = [html.index(day) for day in dates]
     assert positions == sorted(positions)
-    assert html.count("<h2>") == 7
+    assert html.count("<h2>") == 8
 
     # Data remains available on a new request and on the course listing.
     assert client.get("/schedule").data.count(b"<strong>Sprint 1 Report</strong>") == 7

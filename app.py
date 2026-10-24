@@ -7,8 +7,8 @@ from flask import Flask, flash, redirect, render_template, request, url_for
 from auth import auth, current_user, login_required
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from models import db, Course, Assignment, PersonalTask
-from scheduler import generate_study_sessions
+from models import db, Course, Assignment, PersonalTask, StudySession
+from scheduler import generate_study_sessions, refresh_saved_sessions
 from presentation import course_groups, schedule_sections
 from canvas_connection import register_canvas
 from migrations import upgrade_canvas_import
@@ -364,11 +364,73 @@ def delete_calendar_assignment(assignment_id):
     return _calendar_redirect(year, month)
 
 
+
 @app.route("/schedule")
 @login_required
 def schedule():
-    assignments = Assignment.query.join(Course).filter(Course.user_id == current_user().id).all()
-    return render_template("schedule.html", **schedule_sections(assignments, date.today()))
+    today = date.today()
+
+    refresh_saved_sessions(db, current_user().id, today)
+
+    assignments = Assignment.query.join(Course).filter(
+        Course.user_id == current_user().id
+    ).all()
+
+    sections = schedule_sections(assignments, today)
+
+    saved_sessions = StudySession.query.filter_by(
+        user_id=current_user().id
+    ).order_by(StudySession.session_date).all()
+
+    from types import SimpleNamespace
+
+    days = {}
+
+    for session in saved_sessions:
+        days.setdefault(session.session_date, []).append(
+            SimpleNamespace(
+                id=session.id,
+                assignment=session.assignment,
+                duration=session.duration_hours,
+                completed=session.completed,
+            )
+        )
+
+    cutoff = today + timedelta(days=30)
+
+    sections["visible_days"] = [
+        (day, sessions)
+        for day, sessions in sorted(days.items())
+        if today <= day <= cutoff
+    ]
+
+    sections["extra_days"] = [
+        (day, sessions)
+        for day, sessions in sorted(days.items())
+        if day > cutoff
+    ]
+
+    completed_hours = sum(
+        session.duration_hours or 0
+        for session in saved_sessions
+        if session.completed
+    )
+
+    estimated_hours = sum(
+        assignment.estimated_hours or 0
+        for assignment in assignments
+    )
+
+    progress_percent = (
+        round(completed_hours / estimated_hours * 100)
+        if estimated_hours > 0 else 0
+    )
+
+    sections["completed_hours"] = completed_hours
+    sections["estimated_hours"] = estimated_hours
+    sections["progress_percent"] = progress_percent
+
+    return render_template("schedule.html", **sections)
 
 
 
