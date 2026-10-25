@@ -1,0 +1,15 @@
+........................................................................ [ 61%]
+.............................................                            [100%]
+=============================== warnings summary ===============================
+tests/test_privacy.py::test_b_cannot_update_a_task
+tests/test_privacy.py::test_b_cannot_delete_a_task
+tests/test_privacy.py::test_b_cannot_update_a_assignment
+tests/test_privacy.py::test_b_cannot_delete_a_assignment
+tests/test_privacy.py::test_b_cannot_delete_a_course
+tests/test_privacy.py::test_b_cannot_add_assignment_to_a_course
+tests/test_privacy.py::test_b_pages_do_not_show_a_data
+  /Users/danielscookey/Desktop/StudyFlow_Team01/tests/test_privacy.py:32: SAWarning: Object of type <Assignment> not in session, add operation along 'Course.assignments' will not proceed (This warning originated from the Session 'autoflush' process, which was invoked automatically in response to a user-initiated operation. Consider using ``no_autoflush`` context manager if this warning happened while initializing objects.)
+    task = PersonalTask(title="A Secret Task", due_date=due, user_id=a.id)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+117 passed, 7 warnings in 14.76s
