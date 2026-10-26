@@ -409,27 +409,110 @@ def study_availability():
 @app.route("/schedule")
 @login_required
 def schedule():
+    today = date.today()
     user = current_user()
-    assignments = Assignment.query.join(Course).filter(Course.user_id == user.id).all()
-    weekdays = {int(day) for day in user.available_weekdays.split(",")}
+
+    # Get the user's available study days.
+    weekdays = {
+        int(day)
+        for day in user.available_weekdays.split(",")
+    }
+
+    # Generate and save sessions using the user's availability.
     summaries = refresh_saved_sessions(
-        db, user.id, date.today(),
+        db,
+        user.id,
+        today,
         daily_capacity=user.daily_study_hours,
         available_weekdays=weekdays,
     )
-    saved = (StudySession.query.filter_by(user_id=user.id)
-             .order_by(StudySession.session_date, StudySession.id).all())
-    # Keep the user's completed sessions and display capacity shortfalls explicitly.
-    unscheduled = [
-        {"title": assignment.title, "hours": summaries[assignment.id]["unscheduled"]}
-        for assignment in assignments
-        if assignment.id in summaries and summaries[assignment.id]["unscheduled"] > 0
-    ]
-    return render_template(
-        "schedule.html",
-        unscheduled=unscheduled,
-        **schedule_sections(assignments, date.today(), saved_sessions=saved),
+
+    # Retrieve only this user's assignments.
+    assignments = Assignment.query.join(Course).filter(
+        Course.user_id == user.id
+    ).all()
+
+    # Retrieve saved study sessions.
+    saved_sessions = StudySession.query.filter_by(
+        user_id=user.id
+    ).order_by(
+        StudySession.session_date,
+        StudySession.id,
+    ).all()
+
+    # Build the schedule.
+    sections = schedule_sections(
+        assignments,
+        today,
+        saved_sessions=saved_sessions,
     )
+
+    from types import SimpleNamespace
+
+    days = {}
+
+    for session in saved_sessions:
+        days.setdefault(session.session_date, []).append(
+            SimpleNamespace(
+                id=session.id,
+                assignment=session.assignment,
+                duration=session.duration_hours,
+                completed=session.completed,
+            )
+        )
+
+    cutoff = today + timedelta(days=30)
+
+    sections["visible_days"] = [
+        (day, sessions)
+        for day, sessions in sorted(days.items())
+        if today <= day <= cutoff
+    ]
+
+    sections["extra_days"] = [
+        (day, sessions)
+        for day, sessions in sorted(days.items())
+        if day > cutoff
+    ]
+
+    # Calculate completed hours.
+    completed_hours = sum(
+        session.duration_hours or 0
+        for session in saved_sessions
+        if session.completed
+    )
+
+    # Calculate estimated hours.
+    estimated_hours = sum(
+        assignment.estimated_hours or 0
+        for assignment in assignments
+    )
+
+    # Calculate progress percentage.
+    progress_percent = (
+        round(completed_hours / estimated_hours * 100)
+        if estimated_hours > 0
+        else 0
+    )
+
+    sections["completed_hours"] = completed_hours
+    sections["estimated_hours"] = estimated_hours
+    sections["progress_percent"] = progress_percent
+
+    # Identify assignments with unscheduled hours.
+    unscheduled = [
+        {
+            "title": assignment.title,
+            "hours": summaries[assignment.id]["unscheduled"],
+        }
+        for assignment in assignments
+        if assignment.id in summaries
+        and summaries[assignment.id]["unscheduled"] > 0
+    ]
+
+    sections["unscheduled"] = unscheduled
+
+    return render_template("schedule.html", **sections)
 
 
 

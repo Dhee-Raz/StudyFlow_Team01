@@ -28,7 +28,7 @@
           {% if session.id is defined %}
           <form method="post" action="{{ url_for('toggle_session', session_id=session.id) }}">
             <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
-            <button type="submit" class="btn btn-secondary">{{ "Completed" if session.completed else "Upcoming" }}</button>
+            <button type="submit" class="btn btn-secondary">{{ "✓ Completed — Undo" if session.completed else "Mark Complete" }}</button>
           </form>
           {% endif %}
         </div>

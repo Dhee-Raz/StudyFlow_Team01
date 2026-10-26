@@ -33,6 +33,21 @@
   </section>
   {% endif %}
 
+
+<section class="card">
+    <h2>Study Progress</h2>
+
+
+<p>{{ "%.2f"|format(completed_hours) }} of {{ "%.2f"|format(estimated_hours) }} hrs completed ({{ progress_percent }}%)</p>
+
+
+    <progress
+        value="{{ progress_percent }}"
+        max="100"
+        style="width: 100%;">
+    </progress>
+</section>
+
   {% if due_today %}
   <section class="card today-card">
     <div class="card-header today-header">
