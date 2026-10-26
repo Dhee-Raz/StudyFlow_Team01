@@ -47,21 +47,6 @@
         style="width: 100%;">
     </progress>
 </section>
-{% if progress is defined %}
-<section class="card progress-card">
-    <h2>Study Progress</h2>
-    <p>
-        {{ "%.2f"|format(progress.completed_hours) }}
-        of
-        {{ "%.2f"|format(progress.total_hours) }}
-        hrs completed ({{ progress.percentage|int }}%)
-    </p>
-    <progress
-        value="{{ progress.percentage }}"
-        max="100">
-    </progress>
-</section>
-{% endif %}
 
   {% if due_today %}
   <section class="card today-card">
