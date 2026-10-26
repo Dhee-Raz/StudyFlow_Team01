@@ -39,3 +39,33 @@ def upgrade_canvas_import(engine):
         except Exception:
             connection.rollback()
             raise
+
+
+def upgrade_study_availability(engine):
+    """Idempotently add per-user preferences without altering existing user rows.
+
+    Use SQLite's transaction to ensure both ALTER statements either commit together
+    or are rolled back. Defaults cover accounts created before Sprint 2 Ticket 4.
+    """
+    if engine.dialect.name != "sqlite":
+        raise RuntimeError("Study availability migration currently supports SQLite only.")
+    with engine.connect() as connection:
+        connection.exec_driver_sql("BEGIN IMMEDIATE")
+        try:
+            existing = {column[1] for column in
+                        connection.exec_driver_sql("PRAGMA table_info(user)")}
+            if not existing:
+                raise RuntimeError("The user table must exist before upgrading availability.")
+            if "available_weekdays" not in existing:
+                connection.exec_driver_sql(
+                    "ALTER TABLE user ADD COLUMN available_weekdays VARCHAR(13) "
+                    "NOT NULL DEFAULT '0,1,2,3,4,5,6'"
+                )
+            if "daily_study_hours" not in existing:
+                connection.exec_driver_sql(
+                    "ALTER TABLE user ADD COLUMN daily_study_hours FLOAT NOT NULL DEFAULT 4.0"
+                )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
