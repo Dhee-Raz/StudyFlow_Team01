@@ -120,8 +120,16 @@ def plan_sessions(assignments, today, daily_capacity=DEFAULT_DAILY_CAPACITY_HOUR
 
     # Canvas can import assignments without deadlines; keep those for review,
     # but do not attempt to schedule them until the student sets a date.
+    # Earliest deadlines take precedence. For assignments due at the same time,
+    # prioritize the larger remaining workload (greater time pressure).
+    # The final ID tie-breaker makes repeated scheduling deterministic.
+    def priority_key(assignment):
+        done = completed_hours_by_assignment.get(assignment.id, 0.0)
+        remaining = max(0.0, (assignment.estimated_hours or 0.0) - done)
+        return (assignment.due_date, -remaining, assignment.id)
+
     ordered = sorted((a for a in assignments if a.due_date is not None),
-                     key=lambda a: (a.due_date, a.id))
+                     key=priority_key)
     for assignment in ordered:
         done = completed_hours_by_assignment.get(assignment.id, 0.0)
         remaining = max(0.0, (assignment.estimated_hours or 0.0) - done)

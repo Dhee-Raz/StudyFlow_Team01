@@ -91,7 +91,7 @@ def add_assignment():
         course = Course.query.filter_by(id=course_id, user_id=current_user().id).first() if course_id else None
         title = request.form.get("title", "").strip()
         due_date_value = request.form.get("due_date", "")
-        estimated_hours_value = request.form.get("estimated_hours", "")
+        estimated_hours_value = request.form.get("estimated_hours", "").strip() or "3".strip() or "3"
         errors = []
 
         if course is None:
