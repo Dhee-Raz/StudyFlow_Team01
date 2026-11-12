@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Email Reminders - StudyFlow{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Email reminders</h1><p>Stay on top of deadlines even when StudyFlow is closed.</p></div>
+{% if error %}<p class="flashes" role="alert">{{ error }}</p>{% endif %}
+<div class="form-card">
+  <p>Send reminders to your registered email: <strong>{{ email }}</strong></p>
+  <form method="post" class="form">
+    <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+    <label><input type="checkbox" name="enabled" {% if preference and preference.enabled %}checked{% endif %}> Enable email reminders</label>
+    <fieldset><legend>Remind me before each deadline</legend>
+      {% for hour in choices %}<label><input type="checkbox" name="hours" value="{{ hour }}" {% if hour in selected %}checked{% endif %}> {{ hour }} hour{{ 's' if hour != 1 }}</label>{% endfor %}
+    </fieldset>
+    <label for="reminder-timezone">Your timezone</label>
+    <input id="reminder-timezone" name="timezone" value="{{ preference.timezone if preference else 'America/Chicago' }}" list="timezones" required>
+    <datalist id="timezones"><option value="America/Chicago"><option value="America/New_York"><option value="America/Denver"><option value="America/Los_Angeles"><option value="UTC"></datalist>
+    <p>Canvas deadlines use their imported timezone. Date-only manual deadlines mean midnight at the start of that date in your selected timezone.</p>
+    <p>Reminders stop once completed study sessions cover the assignment's estimated hours. Missing deadlines and zero-hour assignments do not receive reminders.</p>
+    <button type="submit">Save preferences</button>
+  </form>
+</div>
+<p>Delivery depends on the email service and the StudyFlow reminder worker running. SMS is not available yet.</p>
+{% endblock %}
