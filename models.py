@@ -113,3 +113,32 @@ class StudySession(db.Model):
         default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
+
+
+class ReminderPreference(db.Model):
+    """Opt-in notification settings; no row means reminders are disabled."""
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), primary_key=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=False)
+    hours = db.Column(db.String(60), nullable=False, default='6,7')
+    timezone = db.Column(db.String(100), nullable=False, default='America/Chicago')
+
+
+class DeadlineNotification(db.Model):
+    """Durable outbox and delivery ledger; times are stored as naive UTC."""
+    __table_args__ = (db.UniqueConstraint('assignment_id', 'deadline_utc', 'hours_before', 'channel', name='uq_deadline_notification'),)
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    assignment_id = db.Column(db.Integer, db.ForeignKey('assignment.id', ondelete='CASCADE'), nullable=False)
+    deadline_utc = db.Column(db.DateTime, nullable=False)
+    hours_before = db.Column(db.Integer, nullable=False)
+    channel = db.Column(db.String(20), nullable=False, default='email')
+    status = db.Column(db.String(20), nullable=False, default='pending', index=True)
+    delivery_key = db.Column(db.String(80), nullable=False, unique=True)
+    payload = db.Column(db.JSON, nullable=True)
+    first_attempt_at = db.Column(db.DateTime, nullable=True)
+    next_attempt_at = db.Column(db.DateTime, nullable=False)
+    lease_until = db.Column(db.DateTime, nullable=True)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    provider_id = db.Column(db.String(255), nullable=True)
+    last_error = db.Column(db.String(100), nullable=True)
+    sent_at = db.Column(db.DateTime, nullable=True)

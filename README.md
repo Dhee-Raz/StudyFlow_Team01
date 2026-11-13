@@ -318,3 +318,19 @@ Run tests using:
 python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
+
+## Sprint 3 — Email deadline reminders
+
+**Status: implemented and tested; live sending is not activated.** Provider setup,
+worker deployment, and a controlled live-email test are deferred to the next session.
+
+Students can opt into email reminders on **Reminders** and select offsets including
+6 and 7 hours. Messages use the registered email and include assignment, course,
+deadline and remaining estimated hours. Completed study hours suppress reminders
+once they cover the assignment estimate. A durable notification ledger and provider
+idempotency prevent repeated sends; failures are logged without message contents.
+
+Email requires a configured Resend sender/API key and an independent worker:
+`python -m flask --app app reminders --loop`. See
+[Email reminder setup and behavior](docs/EMAIL_REMINDERS.md) for timezone semantics,
+configuration, retry limits, scheduling instructions and future SMS extension points.

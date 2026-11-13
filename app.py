@@ -11,6 +11,7 @@ from models import db, Course, Assignment, PersonalTask, StudySession
 from scheduler import generate_study_sessions, refresh_saved_sessions
 from presentation import course_groups, schedule_sections
 from canvas_connection import register_canvas
+from reminders import register_reminders
 from migrations import upgrade_canvas_import, upgrade_study_availability
 
 @event.listens_for(Engine, "connect")
@@ -540,6 +541,7 @@ app.config["CANVAS_ALLOWED_HOSTS"] = tuple(
     host.strip().lower() for host in os.environ.get("STUDYFLOW_CANVAS_ALLOWED_HOSTS", "canvas.txstate.edu").split(",") if host.strip()
 )
 register_canvas(app)
+register_reminders(app)
 
 @app.before_request
 def protect_canvas_pages():
