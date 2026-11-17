@@ -6,6 +6,32 @@
     <h1>Study Schedule</h1>
     <p>Your upcoming sessions, spread out day by day. <a href="{{ url_for('study_availability') }}">Change availability</a></p>
   </div>
+  <section class="card">
+    <div class="card-body">
+      <form method="post" action="{{ url_for('save_schedule_history') }}" class="form">
+        <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+        <label for="history_days">Schedule history</label>
+        <select id="history_days" name="history_days">
+          {% for value, label in history_options.items() %}
+          <option value="{{ value }}" {% if value == history_choice %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Apply filter</button>
+      </form>
+      <p>All upcoming sessions remain accessible. Overall progress includes all dates.</p>
+      {% if older_overdue %}
+      <details>
+        <summary>Older overdue work ({{ older_overdue|length }})</summary>
+        <ul>
+          {% for item in older_overdue %}
+          <li>{{ item.assignment.title }} — {{ item.assignment.course.name }} — due {{ item.assignment.due_date.strftime('%b %d, %Y') }} — {{ "%.2f"|format(item.remaining) }} estimated hours remaining</li>
+          {% endfor %}
+        </ul>
+        <p>Study hours are not a confirmation of submission. Check your course for submission status.</p>
+      </details>
+      {% endif %}
+    </div>
+  </section>
   {% if unscheduled %}
   <section class="card" role="status" aria-label="Study capacity warning">
     <div class="card-body">
@@ -121,7 +147,7 @@
   {% if not visible_days and not extra_days %}
     <div class="empty-state">
       <span class="icon">🗓️</span>
-      No upcoming study sessions yet. <a href="{{ url_for('add_assignment') }}">Add an assignment</a> to generate a schedule.
+      No upcoming study sessions or past sessions in this date range. <a href="{{ url_for('add_assignment') }}">Add an assignment</a> to generate a schedule.
     </div>
   {% else %}
     {% for day, sessions in visible_days %}
