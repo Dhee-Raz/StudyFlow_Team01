@@ -18,10 +18,17 @@
           {% endif %}
           {% if assignment.canvas_missing %}<span class="meta">Not returned by Canvas — check source</span>{% endif %}
           <div class="course-assignment-details">
-            <span>{{ '%g'|format(assignment.estimated_hours) }} hrs study</span>
+            <span class="status-pill status-{{ assignment.status }}">{{ assignment.status_label }}</span>
+            {% if assignment.is_completed %}
+            <span>{{ '%g'|format(assignment.completed_hours) }} hrs logged</span>
+            {% else %}
+            <span>{{ '%g'|format(assignment.completed_hours) }} of {{ '%g'|format(assignment.completed_hours + assignment.remaining_hours) }} hrs done</span>
+            <span>{{ '%g'|format(assignment.remaining_hours) }} hrs left</span>
+            {% endif %}
             {% if assignment.points_possible is not none %}<span>{{ '%g'|format(assignment.points_possible) }} points</span>{% endif %}
             {% if assignment.canvas_timezone %}<span>Due {{ assignment.due_date.strftime('%I:%M %p').lstrip('0') }}</span>{% endif %}
           </div>
+          <progress class="progress-bar progress-bar-small" value="{{ assignment.progress_percent }}" max="100" aria-label="{{ assignment.title }} progress">{{ assignment.progress_percent }}%</progress>
         </div>
         <a class="assignment-edit" href="{{ url_for('calendar_view', selected='assignment-' ~ assignment.id) }}" aria-label="Edit {{ assignment.title }}">Edit</a>
       </li>

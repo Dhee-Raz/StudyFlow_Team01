@@ -319,6 +319,69 @@ python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
+## Sprint 3 — Email deadline reminders
+
+**Status: local test email received; shared hosting is still pending.** Team sender
+domain verification, hosted worker/database deployment, and end-to-end scheduled
+delivery verification remain pending.
+
+Students can opt into email reminders on **Reminders** and select offsets including
+6 and 7 hours. Messages use the registered email and include assignment, course,
+deadline and remaining estimated hours. Completed study hours suppress reminders
+once they cover the assignment estimate. A durable notification ledger and provider
+idempotency prevent repeated sends; failures are logged without message contents.
+
+Email requires a configured Resend sender/API key and an independent worker:
+`python -m flask --app app reminders --loop`. See
+[Email reminder setup and behavior](docs/EMAIL_REMINDERS.md) for timezone semantics,
+configuration, retry limits, scheduling instructions and future SMS extension points.
+## Sprint 3 — Assignment progress tracking
+
+**User story:** As a student, I want to track my assignment progress so that I
+can see how much work I have completed and how much remains before the deadline.
+
+### What it does
+
+- Every assignment has a **status**: `Not Started`, `In Progress`, or `Completed`
+  (`Assignment.status`, default `not_started`).
+- **Completed hours** come from study sessions marked complete on the Schedule
+  page. Marking a session complete on a *Not Started* assignment moves it to
+  *In Progress* automatically. Undoing a session removes its hours again.
+- **Remaining hours** = estimated hours − completed hours (0 once Completed).
+- The Schedule page has an **Assignment Progress** card: overall hours
+  completed/remaining with a progress bar, plus one row per assignment with a
+  status pill, progress bar, hours, a status dropdown, and an **Hours left**
+  field. The Courses page shows the status, hours done/left and a small bar
+  for each assignment.
+- **Adjusting the estimate:** saving *Hours left* sets
+  `estimated_hours = completed + new remaining`, so the scheduler re-plans
+  exactly that many hours. Adding hours to a Completed assignment moves it back
+  to In Progress.
+- **Scheduling:** `plan_sessions()` skips Completed assignments, so
+  `refresh_saved_sessions()` deletes their upcoming sessions (completed
+  sessions are kept as history) and the freed daily capacity goes to other
+  work. Switching back to In Progress / Not Started reschedules what's left.
+- Everything is stored in the database, so progress survives logout/login.
+  Only the assignment's owner can change it (other users get a 404).
+
+### Routes
+
+| Method | Path | Form fields |
+| --- | --- | --- |
+| POST | `/assignments/<id>/status` | `status` (`not_started` / `in_progress` / `completed`), optional `return_to=index` |
+| POST | `/assignments/<id>/remaining` | `remaining_hours` (0–1000; 0 only if hours were already logged), optional `return_to=index` |
+
+### Database
+
+`upgrade_assignment_progress()` in `migrations.py` runs at startup. It adds the
+`status` column to existing SQLite databases (idempotent, in one transaction)
+and marks assignments that already have completed sessions as In Progress.
+
+### Tests
+
+```bash
+python -m pytest -q tests/test_progress_tracking.py
+```
 ## SCRUM-40 — Schedule history filter
 
 On Schedule, choose Today onward, Past 7 days (default), Past 14 days,

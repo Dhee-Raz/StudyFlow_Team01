@@ -26,7 +26,8 @@ def history_view(assignments, sessions, today, choice):
         if start is None or due is None or due >= start:
             visible.add(assignment.id)
         else:
-            remaining = max(0, (assignment.estimated_hours or 0) - completed.get(assignment.id, 0))
+            remaining = (0 if getattr(assignment, "status", None) == "completed" else
+                         max(0, (assignment.estimated_hours or 0) - completed.get(assignment.id, 0)))
             if remaining > 1e-6:
                 older.append(dict(assignment=assignment, remaining=remaining))
     older.sort(key=lambda item: item["assignment"].due_date, reverse=True)
