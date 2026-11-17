@@ -46,6 +46,14 @@ class Course(db.Model):
     )
 
 
+ASSIGNMENT_STATUSES = ("not_started", "in_progress", "completed")
+ASSIGNMENT_STATUS_LABELS = {
+    "not_started": "Not Started",
+    "in_progress": "In Progress",
+    "completed": "Completed",
+}
+
+
 class Assignment(db.Model):
     @property
     def is_exam(self):
@@ -67,6 +75,10 @@ class Assignment(db.Model):
     title = db.Column(db.String(200), nullable=False)
     due_date = db.Column(db.DateTime, nullable=True)
     estimated_hours = db.Column(db.Float, nullable=False)
+    # Progress tracking: completed assignments are excluded from scheduling.
+    status = db.Column(
+        db.String(20), nullable=False, default="not_started", server_default="not_started"
+    )
 
     # Deleting an assignment also deletes its saved study sessions.
     study_sessions = db.relationship(
@@ -81,6 +93,40 @@ class Assignment(db.Model):
         default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
+
+
+    @validates("status")
+    def validate_status(self, key, value):
+        if value not in ASSIGNMENT_STATUSES:
+            raise ValueError("Choose Not Started, In Progress, or Completed.")
+        return value
+
+    @property
+    def status_label(self):
+        return ASSIGNMENT_STATUS_LABELS.get(self.status or "not_started", "Not Started")
+
+    @property
+    def is_completed(self):
+        return self.status == "completed"
+
+    @property
+    def completed_hours(self):
+        """Hours recorded through completed study sessions."""
+        return round(sum(s.duration_hours or 0.0 for s in self.study_sessions if s.completed), 2)
+
+    @property
+    def remaining_hours(self):
+        """Estimated hours still left; zero once the assignment is completed."""
+        if self.is_completed:
+            return 0.0
+        return round(max(0.0, (self.estimated_hours or 0.0) - self.completed_hours), 2)
+
+    @property
+    def progress_percent(self):
+        if self.is_completed:
+            return 100
+        total = self.completed_hours + self.remaining_hours
+        return round(min(100, self.completed_hours / total * 100)) if total > 0 else 0
 
 
 class PersonalTask(db.Model):
