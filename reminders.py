@@ -22,6 +22,8 @@ def utcnow():
 
 
 def remaining_hours(assignment):
+    if assignment.status == "completed":
+        return 0.0
     done = db.session.query(db.func.coalesce(db.func.sum(StudySession.duration_hours), 0)).filter_by(
         assignment_id=assignment.id, user_id=assignment.course.user_id, completed=True).scalar()
     return max(0.0, assignment.estimated_hours - done)

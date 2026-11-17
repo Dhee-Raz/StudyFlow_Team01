@@ -357,7 +357,8 @@ def register_library(app):
     """Attach the blueprint and the upload size limit to the app."""
     # Rejects oversized requests before they are buffered. Slightly above the
     # PDF limit to leave room for the form fields around the file.
-    app.config.setdefault("MAX_CONTENT_LENGTH", MAX_PDF_BYTES + 1024 * 1024)
+    if app.config.get("MAX_CONTENT_LENGTH") is None:
+        app.config["MAX_CONTENT_LENGTH"] = MAX_PDF_BYTES + 1024 * 1024
     app.register_blueprint(library)
 
     @app.errorhandler(RequestEntityTooLarge)

@@ -35,7 +35,7 @@ def app(tmp_path):
     app.config.update(TESTING=True, SECRET_KEY='test', SQLALCHEMY_DATABASE_URI=f'sqlite:///{tmp_path / "reminders.db"}')
     db.init_app(app)
     app.register_blueprint(auth)
-    for name in ('index', 'add_course', 'add_assignment', 'calendar_view', 'schedule', 'study_availability', 'connect_canvas'):
+    for name in ('index', 'add_course', 'add_assignment', 'calendar_view', 'schedule', 'study_availability', 'connect_canvas', 'library.library_home'):
         app.add_url_rule('/' + name, name, lambda: 'ok')
     register_reminders(app)
     with app.app_context():
@@ -249,3 +249,21 @@ def test_status_shows_aggregate_results_without_private_content(app):
     assert 'sent: 1' in result.output
     assert 'student@example.edu' not in result.output
     assert 'Lab report' not in result.output
+
+
+def test_explicit_completed_status_suppresses_new_and_retry_reminders(app):
+    provider = FakeProvider()
+    with app.app_context():
+        item = db.session.get(Assignment, 1)
+        item.status = 'completed'
+        db.session.commit()
+        assert run(provider)['sent'] == 0
+        item.status = 'in_progress'
+        db.session.commit()
+        provider.fail = DeliveryError('timeout', True)
+        assert run(provider)['retry'] == 1
+        item.status = 'completed'
+        db.session.commit()
+        provider.fail = None
+        assert run(provider, NOW + timedelta(minutes=3))['cancelled'] == 1
+        assert len(provider.calls) == 1

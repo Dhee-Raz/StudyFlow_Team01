@@ -15,7 +15,7 @@ Completed in this change:
 - Completed-work suppression using the planner's existing study-session model.
 - Durable delivery ledger, concurrent-worker claims, bounded retries, and sanitized failure logs.
 - Resend adapter and a cron-friendly or continuous background worker command.
-- Automated coverage: **148 tests passed**, including 27 reminder-specific tests.
+- Automated coverage: **178 tests passed** across the combined Sprint 3 features, including 28 reminder-specific tests.
   Seven existing SQLAlchemy warnings originate from the pre-existing privacy tests.
 
 Still required before live activation:
@@ -39,8 +39,8 @@ Students can disable reminders or change offsets at any time.
 
 Emails contain the assignment title, course, deadline, and remaining estimated
 study hours. Remaining hours are the estimate minus completed study-session hours,
-clamped to zero. Under the current planner's completion model, an assignment is
-complete when those hours cover its estimate; completed assignments are suppressed.
+clamped to zero. An assignment marked Completed is suppressed even when no study sessions were
+logged. Reminders are also suppressed when logged hours cover the estimate.
 Zero-hour assignments and assignments without deadlines are also suppressed.
 
 Select a timezone for manual deadlines and email display. Canvas assignments use

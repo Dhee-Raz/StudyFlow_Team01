@@ -320,3 +320,44 @@ def test_migration_adds_status_and_backfills_in_progress(tmp_path):
     with sqlite3.connect(path) as raw:
         rows = raw.execute("SELECT id, status FROM assignment ORDER BY id").fetchall()
     assert rows == [(1, "in_progress"), (2, "not_started")]
+
+
+def test_history_filter_matches_sorted_progress_and_hides_completed_overdue(planner):
+    owner = register(planner, 'owner@example.edu')
+    old = add_assignment(planner, owner, title='Old completed', days_until_due=2)
+    with planner.app.app_context():
+        planner.db.session.get(planner.Assignment, old).due_date = datetime.combine(date.today() - timedelta(days=40), datetime.min.time())
+        planner.db.session.commit()
+    future = add_assignment(planner, owner, title='Future active', days_until_due=3)
+    post(owner, f'/assignments/{old}/status', data={'status': 'completed'})
+    post(owner, '/schedule/history', data={'history_days': '7'})
+    html = owner.get('/schedule').get_data(as_text=True)
+    assert f'/assignments/{future}/status' in html
+    assert f'/assignments/{old}/status' not in html
+    assert 'Older overdue work' not in html
+
+
+def test_library_upload_ownership_and_cleanup(planner, tmp_path):
+    from io import BytesIO
+    from models import CourseMaterial
+    planner.app.config['STUDYFLOW_UPLOAD_DIR'] = str(tmp_path / 'uploads')
+    owner = register(planner, 'owner@example.edu')
+    other = register(planner, 'other@example.edu')
+    item = add_assignment(planner, owner)
+    with planner.app.app_context():
+        course_id = planner.db.session.get(planner.Assignment, item).course_id
+    upload_path = f'/library/course/{course_id}/upload'
+    assert post(other, upload_path, data={'file': (BytesIO(b'%PDF-1.4\n%%EOF'), 'notes.pdf')}).status_code == 404
+    assert post(owner, upload_path, data={'file': (BytesIO(b'%PDF-1.4\n%%EOF'), 'notes.pdf')}).status_code == 302
+    with planner.app.app_context():
+        material = CourseMaterial.query.one()
+        mid, stored = material.id, material.stored_filename
+    assert owner.get(f'/library/material/{mid}/download').status_code == 200
+    assert other.get(f'/library/material/{mid}/download').status_code == 404
+    assert post(other, f'/library/material/{mid}/delete').status_code == 404
+    assert planner.app.config['MAX_CONTENT_LENGTH'] == 11 * 1024 * 1024
+    post(owner, upload_path, data={'file': (BytesIO(b'not a pdf'), 'invalid.pdf')})
+    with planner.app.app_context():
+        assert CourseMaterial.query.count() == 1
+    post(owner, f'/delete-course/{course_id}')
+    assert not (tmp_path / 'uploads' / stored).exists()
