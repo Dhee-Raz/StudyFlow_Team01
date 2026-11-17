@@ -84,6 +84,14 @@
             <input id="assignment-hours" name="estimated_hours" type="number" min="0.01" step="any" value="{{ selected_item.estimated_hours }}" required>
             <button type="submit">Save changes</button>
           </form>
+          <form class="form assignment-memo" method="post" action="{{ url_for('library.save_memo', assignment_id=selected_item.id) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="return_year" value="{{ year }}">
+            <input type="hidden" name="return_month" value="{{ month }}">
+            <label for="assignment-memo">Memo</label>
+            <textarea id="assignment-memo" name="memo" rows="4" maxlength="5000" placeholder="Add a memo for this assignment">{{ selected_item.memo.body if selected_item.memo else '' }}</textarea>
+            <button type="submit">Save memo</button>
+          </form>
       </section>
       {% elif selected_kind == 'personal' and selected_item %}
       <section class="calendar-panel" aria-live="polite">

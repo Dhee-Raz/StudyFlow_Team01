@@ -180,6 +180,7 @@ h1 {
 /* Split cards (header band + body): course cards, Today card, Exams card */
 
 .course-card,
+.progress-card,
 .today-card,
 .exams-card {
   padding: 0;
@@ -187,6 +188,7 @@ h1 {
 }
 
 .course-card .card-header,
+.progress-card .card-header,
 .today-card .card-header,
 .exams-card .card-header {
   display: flex;
@@ -199,6 +201,7 @@ h1 {
 }
 
 .course-card .card-header h2,
+.progress-card .card-header h2,
 .today-card .card-header h2,
 .exams-card .card-header h2 {
   margin: 0;
@@ -208,6 +211,7 @@ h1 {
 }
 
 .course-card .card-body,
+.progress-card .card-body,
 .today-card .card-body,
 .exams-card .card-body {
   padding: 1.1rem 1.5rem 1.35rem;
@@ -1114,4 +1118,151 @@ h1 {
 
 .complete-btn:hover {
     background-color: #218838;
+}
+
+
+/* Sprint 3: assignment progress tracking */
+.progress-bar {
+  width: 100%;
+  height: 0.6rem;
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.progress-bar::-webkit-progress-bar { background: var(--border); border-radius: 999px; }
+.progress-bar::-webkit-progress-value { background: var(--primary); border-radius: 999px; }
+.progress-bar::-moz-progress-bar { background: var(--primary); border-radius: 999px; }
+.progress-bar-small { height: 0.4rem; margin-top: 0.35rem; }
+.progress-summary { margin-bottom: 1rem; }
+.progress-totals { margin: 0 0 0.4rem; }
+.progress-row-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+.progress-row .meta { display: block; }
+.progress-hours { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--text-muted); }
+.progress-controls { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.35rem; }
+.inline-form { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; }
+.inline-form input[type="number"] { width: 5rem; }
+.btn-small { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+.status-pill {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--border);
+}
+.status-pill.status-in_progress { color: var(--primary-dark); background: var(--primary-tint); }
+.status-pill.status-completed { color: #1d6b3a; background: #ddf3e4; }
+.progress-row.status-completed .progress-title { text-decoration: line-through; color: var(--text-muted); }
+
+/* Append to static/style.css. Uses the app's existing color variables, so it
+   follows light and dark mode automatically. */
+
+/* Small button variant, used for View / Download / Open / Library. */
+.btn-small {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+/* Search bar above the library lists. */
+.library-search {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.library-search input[type="search"] {
+  flex: 1 1 18rem;
+  max-width: 32rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.96rem;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.library-search input[type="search"]:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-tint);
+}
+
+/* PDF rows: title and details on the left, actions on the right. */
+.assignment-list li.library-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.library-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.library-row-main .meta {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+/* Upload / note forms inside cards. */
+.library-form {
+  max-width: 520px;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.library-form button {
+  align-self: flex-start;
+}
+
+/* Collapsible note rows. */
+.library-note {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 0.6rem;
+}
+
+.library-note summary {
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.library-note summary .meta {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.library-note .library-form {
+  margin-top: 0.9rem;
+}
+
+.library-note-delete {
+  margin-top: 0.75rem;
+}
+
+/* The memo box in the calendar's assignment panel. */
+.assignment-memo {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
 }

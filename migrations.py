@@ -71,6 +71,32 @@ def upgrade_study_availability(engine):
             raise
 
 
+def upgrade_assignment_progress(engine):
+    """Idempotently add Assignment.status for progress tracking (Sprint 3).
+
+    Existing assignments start as 'not_started'; recorded study sessions are untouched.
+    """
+    if engine.dialect.name != "sqlite":
+        raise RuntimeError("Assignment progress migration currently supports SQLite only.")
+    with engine.connect() as connection:
+        connection.exec_driver_sql("BEGIN IMMEDIATE")
+        try:
+            existing = {column[1] for column in
+                        connection.exec_driver_sql("PRAGMA table_info(assignment)")}
+            if existing and "status" not in existing:
+                connection.exec_driver_sql(
+                    "ALTER TABLE assignment ADD COLUMN status VARCHAR(20) "
+                    "NOT NULL DEFAULT 'not_started'"
+                )
+                # Assignments that already have completed sessions are in progress.
+                connection.exec_driver_sql(
+                    "UPDATE assignment SET status = 'in_progress' WHERE id IN "
+                    "(SELECT assignment_id FROM study_session WHERE completed = 1)"
+                )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
 def upgrade_schedule_history(engine):
     """Add the schedule display preference without changing existing records."""
     with engine.begin() as connection:

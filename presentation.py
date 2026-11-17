@@ -1,5 +1,5 @@
 """Grouped course UI and schedule sections without replacing manual scheduling."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from itertools import groupby
 from types import SimpleNamespace
 from scheduler import generate_study_sessions
@@ -22,6 +22,7 @@ def course_groups(courses, today):
 def schedule_sections(assignments, today, saved_sessions=None):
     exams = sorted((a for a in assignments if a.is_exam and a.due_date and a.due_date.date() >= today), key=lambda a: a.due_date)
     normal = [a for a in assignments if not a.is_exam]
+    schedulable = [a for a in normal if getattr(a, "status", None) != "completed"]
     due_today = sorted((a for a in normal if a.due_date and a.due_date.date() == today), key=lambda a: -(a.points_possible or 0))
     if saved_sessions is not None:
         # Ticket 4: render the persisted, user-specific availability plan.
@@ -46,11 +47,22 @@ def schedule_sections(assignments, today, saved_sessions=None):
                                                   + item.duration_hours)
         progress = []
         for assignment in assignments:
-            done = completed.get(assignment.id, 0.0)
-            total = assignment.estimated_hours or 0
-            percent = round(min(100, done / total * 100)) if total > 0 else 100
-            progress.append({"title": assignment.title, "done": done,
-                             "total": total, "percent": percent})
+            done = round(completed.get(assignment.id, 0.0), 2)
+            if getattr(assignment, "status", None) == "completed":
+                remaining, percent = 0.0, 100
+            else:
+                remaining = round(max(0.0, (assignment.estimated_hours or 0) - done), 2)
+                total = done + remaining
+                percent = round(min(100, done / total * 100)) if total > 0 else 0
+            progress.append({"id": assignment.id, "title": assignment.title,
+                             "assignment": assignment, "done": done,
+                             "remaining": remaining, "total": done + remaining,
+                             "percent": percent,
+                             "status": getattr(assignment, "status", "not_started")})
+        status_order = {"in_progress": 0, "not_started": 1, "completed": 2}
+        progress.sort(key=lambda row: (status_order.get(row["status"], 1),
+                                       row["assignment"].due_date or datetime.max,
+                                       row["id"]))
         cutoff = today + timedelta(days=30)
         return dict(progress=progress, visible_days=[entry for entry in days if entry[0] <= cutoff],
                     extra_days=[entry for entry in days if entry[0] > cutoff],
@@ -58,14 +70,14 @@ def schedule_sections(assignments, today, saved_sessions=None):
                     exams=[dict(assignment=a, days_until=(a.due_date.date() - today).days)
                            for a in exams])
 
-    imported = [a for a in normal if a.canvas_key and a.due_date]
+    imported = [a for a in schedulable if a.canvas_key and a.due_date]
     by_id = {a.id: a for a in imported}
     proxies = [SimpleNamespace(id=a.id, due_date=a.due_date.date(), estimated_hours=a.estimated_hours) for a in imported]
     schedule = build_schedule(proxies, today=today)
     for sessions in schedule.values():
         for session in sessions:
             session['assignment'] = by_id[session['assignment'].id]
-    for assignment in normal:
+    for assignment in schedulable:
         if not assignment.canvas_key:
             for session in generate_study_sessions(assignment):
                 schedule.setdefault(session['date'], []).append(session)
