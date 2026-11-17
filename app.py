@@ -7,11 +7,11 @@ from flask import Flask, flash, redirect, render_template, request, url_for
 from auth import auth, current_user, login_required
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from models import db, Course, Assignment, PersonalTask, StudySession
+from models import db, Course, Assignment, PersonalTask, StudySession, ASSIGNMENT_STATUSES, ASSIGNMENT_STATUS_LABELS
 from scheduler import generate_study_sessions, refresh_saved_sessions
 from presentation import course_groups, schedule_sections
 from canvas_connection import register_canvas
-from migrations import upgrade_canvas_import, upgrade_study_availability
+from migrations import upgrade_canvas_import, upgrade_study_availability, upgrade_assignment_progress
 
 @event.listens_for(Engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
@@ -30,6 +30,7 @@ with app.app_context():
     db.create_all()
     upgrade_canvas_import(db.engine)
     upgrade_study_availability(db.engine)
+    upgrade_assignment_progress(db.engine)
 
 
 @app.context_processor
@@ -475,20 +476,11 @@ def schedule():
         if day > cutoff
     ]
 
-    # Calculate completed hours.
-    completed_hours = sum(
-        session.duration_hours or 0
-        for session in saved_sessions
-        if session.completed
-    )
-
-    # Calculate estimated hours.
-    estimated_hours = sum(
-        assignment.estimated_hours or 0
-        for assignment in assignments
-    )
-
-    # Calculate progress percentage.
+    # Overall progress: hours recorded vs. hours still estimated. Completed
+    # assignments contribute their recorded hours and nothing remaining.
+    completed_hours = round(sum(row["done"] for row in sections["progress"]), 2)
+    remaining_hours = round(sum(row["remaining"] for row in sections["progress"]), 2)
+    estimated_hours = round(completed_hours + remaining_hours, 2)
     progress_percent = (
         round(completed_hours / estimated_hours * 100)
         if estimated_hours > 0
@@ -497,7 +489,10 @@ def schedule():
 
     sections["completed_hours"] = completed_hours
     sections["estimated_hours"] = estimated_hours
+    sections["remaining_hours"] = remaining_hours
     sections["progress_percent"] = progress_percent
+    sections["status_labels"] = ASSIGNMENT_STATUS_LABELS
+    sections["completed_count"] = sum(1 for a in assignments if a.status == "completed")
 
     # Identify assignments with unscheduled hours.
     unscheduled = [
@@ -527,6 +522,10 @@ def toggle_session(session_id):
 
     study_session.completed = not study_session.completed
     study_session.completed_at = datetime.now() if study_session.completed else None
+    # Recording study time starts the assignment automatically.
+    assignment = study_session.assignment
+    if study_session.completed and assignment.status == "not_started":
+        assignment.status = "in_progress"
     db.session.commit()
 
     if study_session.completed:
@@ -534,6 +533,72 @@ def toggle_session(session_id):
     else:
         flash("Session marked incomplete.")
     return redirect(url_for("schedule"))
+
+
+# ---------------------------------------------------------------------------
+# Sprint 3: assignment progress tracking
+# ---------------------------------------------------------------------------
+
+def _owned_assignment(assignment_id):
+    return Assignment.query.join(Course).filter(
+        Assignment.id == assignment_id,
+        Course.user_id == current_user().id,
+    ).first_or_404()
+
+
+def _progress_redirect():
+    # Only allow returning to known pages (no open redirects).
+    target = request.form.get("return_to")
+    return redirect(url_for("index" if target == "index" else "schedule"))
+
+
+@app.route("/assignments/<int:assignment_id>/status", methods=["POST"])
+@login_required
+def update_assignment_status(assignment_id):
+    """Set an assignment to Not Started, In Progress, or Completed (owner only)."""
+    assignment = _owned_assignment(assignment_id)
+    status = request.form.get("status", "")
+    if status not in ASSIGNMENT_STATUSES:
+        flash("Choose Not Started, In Progress, or Completed.")
+        return _progress_redirect()
+    assignment.status = status
+    db.session.commit()
+    if status == "completed":
+        flash(f"“{assignment.title}” marked Completed. It won’t be scheduled anymore.")
+    else:
+        flash(f"“{assignment.title}” is now {ASSIGNMENT_STATUS_LABELS[status]}.")
+    return _progress_redirect()
+
+
+@app.route("/assignments/<int:assignment_id>/remaining", methods=["POST"])
+@login_required
+def update_remaining_hours(assignment_id):
+    """Let the student re-estimate how many hours are left.
+
+    The total estimate becomes hours already completed + the new remaining
+    estimate, so the scheduler (which plans estimated - completed) picks it up.
+    """
+    assignment = _owned_assignment(assignment_id)
+    try:
+        remaining = float(request.form.get("remaining_hours", "").strip())
+    except ValueError:
+        remaining = None
+    if remaining is None or not math.isfinite(remaining) or remaining < 0 or remaining > 1000:
+        flash("Enter remaining hours between 0 and 1000.")
+        return _progress_redirect()
+
+    done = assignment.completed_hours
+    if remaining == 0 and done == 0:
+        flash("Remaining hours must be greater than zero, or mark the assignment Completed.")
+        return _progress_redirect()
+
+    assignment.estimated_hours = round(done + remaining, 2)
+    if remaining > 0 and assignment.status == "completed":
+        # More work left means it is no longer complete; resume scheduling.
+        assignment.status = "in_progress"
+    db.session.commit()
+    flash(f"Updated “{assignment.title}”: {remaining:g} hrs remaining.")
+    return _progress_redirect()
 
 
 app.config["CANVAS_ALLOWED_HOSTS"] = tuple(
