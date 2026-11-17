@@ -12,6 +12,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     # ISO weekdays: Monday=0 through Sunday=6. Database defaults protect existing users.
     available_weekdays = db.Column(db.String(13), nullable=False, default="0,1,2,3,4,5,6", server_default="0,1,2,3,4,5,6")
+    schedule_history_days = db.Column(db.String(3), nullable=False, default="7", server_default="7")
     daily_study_hours = db.Column(db.Float, nullable=False, default=4.0, server_default="4.0")
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
