@@ -232,6 +232,30 @@ def register_reminders(app):
                                choices=ALLOWED_HOURS, selected=offsets(preference) if preference else {6, 7},
                                email=user.email), 400 if error else 200
 
+    @app.cli.command('reminders-check')
+    def reminders_check():
+        """Check local delivery configuration without sending email or exposing secrets."""
+        missing = [name for name, value in (
+            ('RESEND_API_KEY', current_app.config.get('RESEND_API_KEY')),
+            ('STUDYFLOW_REMINDER_FROM', current_app.config.get('REMINDER_FROM')),
+        ) if not value or not value.strip()]
+        if missing:
+            raise click.ClickException('Missing configuration: ' + ', '.join(missing))
+        # Query both tables to catch missing schema/database access before starting a worker.
+        ReminderPreference.query.count()
+        DeadlineNotification.query.count()
+        click.echo('Local configuration and reminder tables are ready. No email was sent.')
+        click.echo('Sender verification, provider access, and inbox delivery still require a live test.')
+
+    @app.cli.command('reminders-status')
+    def reminders_status():
+        """Show aggregate delivery counts without exposing recipients or message content."""
+        click.echo(f'Enabled accounts: {ReminderPreference.query.filter_by(enabled=True).count()}')
+        for status in ('pending', 'sending', 'retry', 'sent', 'failed', 'cancelled'):
+            count = DeadlineNotification.query.filter_by(status=status).count()
+            click.echo(f'{status}: {count}')
+        click.echo('sent means provider accepted, not confirmed inbox delivery.')
+
     @app.cli.command('reminders')
     @click.option('--loop', is_flag=True, help='Keep running; default is a single cron-friendly pass.')
     @click.option('--interval', default=60, type=click.IntRange(30, 300), help='Seconds between worker passes.')

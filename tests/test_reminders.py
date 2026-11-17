@@ -222,3 +222,30 @@ def test_database_creation_is_repeatable_and_keeps_ledger(app):
     with app.app_context():
         run(FakeProvider()); db.create_all(); db.create_all()
         assert DeadlineNotification.query.one().status == 'sent'
+
+
+def test_setup_check_requires_credentials_without_sending(app, monkeypatch):
+    send = Mock()
+    monkeypatch.setattr(ResendEmail, 'send', send)
+    app.config.update(RESEND_API_KEY=None, REMINDER_FROM=None)
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=['reminders-check'])
+    assert result.exit_code != 0
+    assert 'RESEND_API_KEY' in result.output
+    app.config.update(RESEND_API_KEY='private-test-key', REMINDER_FROM='sender@example.edu')
+    result = runner.invoke(args=['reminders-check'])
+    assert result.exit_code == 0
+    assert 'No email was sent' in result.output
+    assert 'private-test-key' not in result.output
+    send.assert_not_called()
+
+
+def test_status_shows_aggregate_results_without_private_content(app):
+    with app.app_context():
+        run(FakeProvider())
+    result = app.test_cli_runner().invoke(args=['reminders-status'])
+    assert result.exit_code == 0
+    assert 'Enabled accounts: 1' in result.output
+    assert 'sent: 1' in result.output
+    assert 'student@example.edu' not in result.output
+    assert 'Lab report' not in result.output

@@ -2,9 +2,12 @@
 
 ## Delivery status and handoff
 
-**Implemented and tested; live email delivery is not activated.** The current
-web app can save reminder preferences, but running the web app alone sends no
-emails. Automated tests use fake providers; no real email delivery has been tested.
+**Local email delivery verified; shared hosting is still pending.** A controlled
+Resend test was accepted and receipt confirmed by the account owner. The local
+worker was started with 6- and 7-hour preferences. Running the web app alone does
+not send emails. This is not an always-on team deployment: a verified sender domain
+for other recipients and hosted app/database/worker setup remain pending.
+Automated tests use fake providers; live scheduling has not been verified end to end.
 
 Completed in this change:
 - Per-user opt-in/opt-out and configurable offsets, including 6 and 7 hours.
@@ -12,13 +15,13 @@ Completed in this change:
 - Completed-work suppression using the planner's existing study-session model.
 - Durable delivery ledger, concurrent-worker claims, bounded retries, and sanitized failure logs.
 - Resend adapter and a cron-friendly or continuous background worker command.
-- Automated coverage: **146 tests passed**, including 25 reminder-specific tests.
+- Automated coverage: **148 tests passed**, including 27 reminder-specific tests.
   Seven existing SQLAlchemy warnings originate from the pre-existing privacy tests.
 
-Deferred until the next implementation session:
-1. Configure a Resend account, verified sender domain, and private API key.
+Still required before live activation:
+1. Verify a sender domain for team delivery; the local test account/key is configured.
 2. Deploy/schedule the worker with the same database as the web app.
-3. Perform an authorized live-email smoke test with a controlled recipient.
+3. Complete an end-to-end scheduled reminder test; standalone delivery is verified.
 4. Verify deployment restart/recovery and provider delivery monitoring.
 5. Consider delivery/bounce webhooks and optional SMS integration separately.
 
@@ -125,8 +128,8 @@ Unexpected process failures are recovered through persisted leases and idempoten
 `sent` means **accepted by the email provider**, not confirmed arrival in an inbox.
 Spam filtering, bounces and delayed delivery are outside this implementation's
 control. Inspect the provider dashboard for downstream delivery/bounce events;
-webhook ingestion is not implemented. No live-provider verification has been
-performed without a configured sender/key.
+webhook ingestion is not implemented. A controlled local provider test succeeded; hosted delivery and downstream
+monitoring still need verification.
 
 ## Future SMS integration
 
@@ -151,3 +154,113 @@ No actual emails are sent by tests.
 Provider references:
 - https://resend.com/docs/api-reference/emails/send-email
 - https://resend.com/docs/dashboard/emails/idempotency-keys
+
+## Activation and operations checklist
+
+The deployment helpers below are available; they do not activate delivery by themselves.
+The provider credentials, target host, and controlled recipient must be configured
+before the live verification checklist can be completed.
+
+### Preflight and monitoring
+
+Run these commands from the same environment and working directory as the worker:
+
+```bash
+.venv/bin/python -m flask --app app reminders-check
+.venv/bin/python -m flask --app app reminders-status
+```
+
+`reminders-check` checks that credentials are present and reminder tables can be
+queried. It does not contact Resend, validate the API key or sender, or send mail.
+`reminders-status` shows enabled-account and delivery-state counts without exposing
+student email addresses or assignment content. Investigate rising `failed` counts
+or persistent `retry`/`sending` records using worker logs and the provider dashboard.
+These are manual operational checks, not an automated alerting service.
+
+### Persistent Linux deployment
+
+An example service is provided at `deploy/studyflow-reminders.service`. Adjust its
+user, group, working directory and virtualenv paths to the actual web deployment.
+Create `/etc/studyflow/reminders.env` outside the repository, readable only by the
+administrator, with the three variables in `.env.reminders.example`. Use the exact
+same absolute database URI as the web process; ensure the service user can write
+the database and its containing directory. Install the service only after the
+controlled live test succeeds:
+
+```bash
+sudo cp deploy/studyflow-reminders.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now studyflow-reminders
+sudo systemctl status studyflow-reminders
+sudo journalctl -u studyflow-reminders --since '1 hour ago'
+```
+
+The service checks local setup before starting and restarts on failure, with a
+restart limit to avoid looping indefinitely on bad configuration. After correcting
+configuration, use `sudo systemctl reset-failed studyflow-reminders` and restart
+it. To stop delivery: `sudo systemctl disable --now studyflow-reminders`.
+This template is for Linux, not macOS. A Mac demonstration can use the foreground
+worker command above but requires the Mac to stay awake and the terminal process
+to remain running.
+
+### Controlled live verification
+
+Use an isolated test database and an account whose registered email belongs to the
+tester; do not test by enabling all production users. Do not publish credentials,
+message contents, or student addresses in screenshots or logs.
+
+1. Configure a verified sender and API key, then run `reminders-check`.
+2. Enable a 7-hour reminder for the test account. Create a test assignment due
+   seven hours from now with remaining work; set an explicit time and timezone.
+3. Run one worker pass. Check `reminders-status`, provider acceptance, and receipt
+   in the tester's inbox (including spam). Check title, course, deadline and hours.
+4. Repeat the pass: confirm the same notification is not sent again. Repeat with
+   a separate assignment due six hours from now and a 6-hour preference.
+5. Disable reminders and verify a newly eligible assignment sends nothing. Enable
+   them again and verify completed study hours suppress a different due reminder.
+6. Restart the worker against the same test database and confirm sent records
+   remain deduplicated. Automated tests separately exercise provider failures,
+   retry leases and uncertain responses without sending real mail.
+7. Record the date, environment, results and provider message IDs privately. Only
+   then activate the supervised worker against the web app's database.
+
+Provider dashboard delivery/bounce monitoring remains necessary: successful API
+acceptance is not evidence of inbox delivery. A standalone local delivery test succeeded; the complete hosted scheduling
+checklist has not yet been verified.
+
+### Recommended first setup on a Mac
+
+Start with a controlled test to your own address using Resend's test sender. Create
+an account at https://resend.com and a sending API key in its dashboard. You do not
+need a domain for this own-address test. The default `onboarding@resend.dev` sender
+can send only to the email address associated with your Resend account. The test
+student's registered StudyFlow email must match it. For other students, verify a
+domain you control and configure a sender on that domain first.
+
+In your own terminal, from the repository directory, run:
+
+```bash
+.venv/bin/python scripts/reminder_setup.py configure --database /absolute/path/to/the/webapps/studyflow.db
+.venv/bin/python scripts/reminder_setup.py check
+```
+
+Replace the database path with the existing database used by the running web app;
+the helper refuses a nonexistent file. Enter the API key at the hidden prompt,
+not in chat or a command argument. Configuration is stored in
+`~/.config/studyflow/reminders.json` with owner-only permissions, outside Git.
+The helper does not change the web app's database settings. Use an isolated test
+web app/database for the controlled verification described above.
+
+Once the correct test account, reminder preferences, and assignment are ready:
+
+```bash
+.venv/bin/python scripts/reminder_setup.py start
+```
+
+This starts real delivery for eligible opted-in accounts in the configured database.
+Keep the Mac awake and the terminal running. Stop with Control-C. In a second
+terminal, use `scripts/reminder_setup.py status` with the same virtualenv Python.
+This foreground demo is not an always-on deployment; use a supervised hosted worker
+and persistent shared database for reminders that continue while the Mac is off.
+
+Reference: https://resend.com/docs/knowledge-base/403-error-resend-dev-domain
