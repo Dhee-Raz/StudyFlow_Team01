@@ -14,6 +14,8 @@ from canvas_connection import register_canvas
 from reminders import register_reminders
 from library import register_library, remove_stored_files
 from migrations import upgrade_canvas_import, upgrade_study_availability, upgrade_assignment_progress
+from migrations import upgrade_schedule_history
+from schedule_history import history_view, HISTORY_OPTIONS
 
 @event.listens_for(Engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
@@ -34,6 +36,7 @@ with app.app_context():
     upgrade_canvas_import(db.engine)
     upgrade_study_availability(db.engine)
     upgrade_assignment_progress(db.engine)
+    upgrade_schedule_history(db.engine)
 
 
 @app.context_processor
@@ -414,6 +417,17 @@ def study_availability():
                            selected=chosen, hours=hours)
 
 
+@app.route("/schedule/history", methods=["POST"])
+@login_required
+def save_schedule_history():
+    choice = request.form.get("history_days", "")
+    if choice not in HISTORY_OPTIONS:
+        return "Invalid schedule history range", 400
+    current_user().schedule_history_days = choice
+    db.session.commit()
+    return redirect(url_for("schedule"))
+
+
 @app.route("/schedule")
 @login_required
 def schedule():
@@ -469,12 +483,14 @@ def schedule():
             )
         )
 
+    history = history_view(assignments, saved_sessions, today, user.schedule_history_days)
+    sections.update(history)
     cutoff = today + timedelta(days=30)
 
     sections["visible_days"] = [
         (day, sessions)
         for day, sessions in sorted(days.items())
-        if today <= day <= cutoff
+        if (history['history_start'] is None or day >= history['history_start']) and day <= cutoff
     ]
 
     sections["extra_days"] = [
@@ -506,13 +522,15 @@ def schedule():
         {
             "title": assignment.title,
             "hours": summaries[assignment.id]["unscheduled"],
+            "assignment_id": assignment.id,
         }
         for assignment in assignments
         if assignment.id in summaries
         and summaries[assignment.id]["unscheduled"] > 0
     ]
 
-    sections["unscheduled"] = unscheduled
+    sections["unscheduled"] = [item for item in unscheduled if item["assignment_id"] in history["visible_assignment_ids"]]
+    sections["progress"] = [entry for entry in sections["progress"] if entry["id"] in history["visible_assignment_ids"]]
 
     return render_template("schedule.html", **sections)
 

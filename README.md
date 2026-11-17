@@ -382,3 +382,13 @@ and marks assignments that already have completed sessions as In Progress.
 ```bash
 python -m pytest -q tests/test_progress_tracking.py
 ```
+## SCRUM-40 — Schedule history filter
+
+On Schedule, choose Today onward, Past 7 days (default), Past 14 days,
+Past 30 days, or Entire semester, then Apply filter. The preference is saved
+per account. All upcoming sessions remain accessible; older overdue work
+is summarized by estimated hours not marked complete, not submission status.
+Overall progress includes all records. The filter itself changes only the
+preference, not assignments or sessions. Existing automatic schedule refresh
+behavior remains unchanged. SQLite startup adds the preference with a seven-day
+default; back up your local database before upgrading.

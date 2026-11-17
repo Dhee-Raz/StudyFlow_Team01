@@ -97,3 +97,11 @@ def upgrade_assignment_progress(engine):
         except Exception:
             connection.rollback()
             raise
+def upgrade_schedule_history(engine):
+    """Add the schedule display preference without changing existing records."""
+    with engine.begin() as connection:
+        columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(user)")}
+        if "schedule_history_days" not in columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE user ADD COLUMN schedule_history_days VARCHAR(3) NOT NULL DEFAULT '7'"
+            )
