@@ -11,6 +11,7 @@ from models import db, Course, Assignment, PersonalTask, StudySession
 from scheduler import generate_study_sessions, refresh_saved_sessions
 from presentation import course_groups, schedule_sections
 from canvas_connection import register_canvas
+from library import register_library, remove_stored_files
 from migrations import upgrade_canvas_import, upgrade_study_availability
 
 @event.listens_for(Engine, "connect")
@@ -26,6 +27,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = os.environ.get("STUDYFLOW_SECRET_KEY", "dev-secret-key")
 db.init_app(app)
 app.register_blueprint(auth)
+register_library(app)
 with app.app_context():
     db.create_all()
     upgrade_canvas_import(db.engine)
@@ -68,11 +70,15 @@ def add_course():
 @login_required
 def delete_course(course_id):
     course = Course.query.filter_by(id=course_id, user_id=current_user().id).first_or_404()
+    # Remember the PDF files so they can be removed from disk after the commit.
+    stored_files = [material.stored_filename for material in course.materials]
     # Remove dependents first to respect the required course foreign key.
+    # (Notes and PDF records are removed by the Course relationship cascade.)
     for assignment in list(course.assignments):
         db.session.delete(assignment)
     db.session.delete(course)
     db.session.commit()
+    remove_stored_files(stored_files)
     return redirect(url_for("index"))
 
 
