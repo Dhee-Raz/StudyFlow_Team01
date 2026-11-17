@@ -147,7 +147,7 @@
   {% if not visible_days and not extra_days %}
     <div class="empty-state">
       <span class="icon">🗓️</span>
-      No study sessions in this date range. <a href="{{ url_for('add_assignment') }}">Add an assignment</a> to generate a schedule.
+      No upcoming study sessions or past sessions in this date range. <a href="{{ url_for('add_assignment') }}">Add an assignment</a> to generate a schedule.
     </div>
   {% else %}
     {% for day, sessions in visible_days %}
