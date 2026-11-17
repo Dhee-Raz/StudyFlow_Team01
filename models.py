@@ -44,6 +44,16 @@ class Course(db.Model):
         backref="course",
         lazy=True
     )
+    # Deleting a course also deletes its notes and PDF records.
+    # (PDF files on disk are removed by library.remove_stored_files.)
+    notes = db.relationship(
+        "CourseNote", backref="course", lazy=True,
+        cascade="all, delete-orphan",
+    )
+    materials = db.relationship(
+        "CourseMaterial", backref="course", lazy=True,
+        cascade="all, delete-orphan",
+    )
 
 
 class Assignment(db.Model):
@@ -73,6 +83,14 @@ class Assignment(db.Model):
         "StudySession",
         backref="assignment",
         lazy=True,
+        cascade="all, delete-orphan",
+    )
+
+    # One plain-text memo per assignment (deleted with the assignment).
+    memo = db.relationship(
+        "AssignmentMemo",
+        backref="assignment",
+        uselist=False,
         cascade="all, delete-orphan",
     )
 
@@ -112,4 +130,55 @@ class StudySession(db.Model):
         db.DateTime,
         default=lambda: datetime.now(timezone.utc),
         nullable=False
+    )
+
+
+class CourseNote(db.Model):
+    """A plain-text note kept in a course's materials library."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False, index=True)
+    title = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.Text, nullable=False, default="")
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class CourseMaterial(db.Model):
+    """Metadata for an uploaded PDF. The file itself lives on disk, outside static/."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False, index=True)
+    title = db.Column(db.String(200), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    # Random server-generated name (<32 hex chars>.pdf); never derived from user input.
+    stored_filename = db.Column(db.String(64), nullable=False, unique=True)
+    size_bytes = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+
+class AssignmentMemo(db.Model):
+    """A short plain-text memo attached to one assignment."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    assignment_id = db.Column(
+        db.Integer, db.ForeignKey("assignment.id"), nullable=False, unique=True
+    )
+    body = db.Column(db.Text, nullable=False, default="")
+    updated_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
