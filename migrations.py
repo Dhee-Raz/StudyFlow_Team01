@@ -69,3 +69,59 @@ def upgrade_study_availability(engine):
         except Exception:
             connection.rollback()
             raise
+
+
+        
+def upgrade_session_rescheduling(engine):
+    """Add SCRUM-35 session tracking fields to an existing SQLite database."""
+    if engine.dialect.name != "sqlite":
+        raise RuntimeError(
+            "Session rescheduling migration currently supports SQLite only."
+        )
+
+    with engine.connect() as connection:
+        connection.exec_driver_sql("BEGIN IMMEDIATE")
+
+        try:
+            columns = {
+                row[1]
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(study_session)"
+                )
+            }
+
+            if not columns:
+                raise RuntimeError(
+                    "The study_session table must exist before migration."
+                )
+
+            if "status" not in columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE study_session "
+                    "ADD COLUMN status VARCHAR(20) "
+                    "NOT NULL DEFAULT 'scheduled'"
+                )
+
+            if "completed_hours" not in columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE study_session "
+                    "ADD COLUMN completed_hours FLOAT "
+                    "NOT NULL DEFAULT 0.0"
+                )
+
+            # Preserve completion data from older sessions.
+            connection.exec_driver_sql(
+                "UPDATE study_session "
+                "SET status = 'completed', "
+                "completed_hours = duration_hours "
+                "WHERE completed = 1 "
+                "AND status = 'scheduled' "
+                "AND completed_hours = 0"
+            )
+
+            connection.commit()
+
+        except Exception:
+            connection.rollback()
+            raise
+

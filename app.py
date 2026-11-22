@@ -11,7 +11,13 @@ from models import db, Course, Assignment, PersonalTask, StudySession
 from scheduler import generate_study_sessions, refresh_saved_sessions
 from presentation import course_groups, schedule_sections
 from canvas_connection import register_canvas
-from migrations import upgrade_canvas_import, upgrade_study_availability
+
+from migrations import (
+    upgrade_canvas_import,
+    upgrade_study_availability,
+    upgrade_session_rescheduling,
+)
+
 
 @event.listens_for(Engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
@@ -26,10 +32,12 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = os.environ.get("STUDYFLOW_SECRET_KEY", "dev-secret-key")
 db.init_app(app)
 app.register_blueprint(auth)
+
 with app.app_context():
     db.create_all()
     upgrade_canvas_import(db.engine)
     upgrade_study_availability(db.engine)
+    upgrade_session_rescheduling(db.engine)
 
 
 @app.context_processor
@@ -516,24 +524,40 @@ def schedule():
 
 
 
+
+
 @app.route("/sessions/<int:session_id>/toggle", methods=["POST"])
 @login_required
 def toggle_session(session_id):
     """Mark a study session complete or incomplete (owner only)."""
-    # Filtering by user_id means other users get a 404, not someone else's session.
+
+    # Only allow the session owner to make changes.
     study_session = StudySession.query.filter_by(
-        id=session_id, user_id=current_user().id
+        id=session_id,
+        user_id=current_user().id
     ).first_or_404()
 
+    # Toggle the session completion status.
     study_session.completed = not study_session.completed
-    study_session.completed_at = datetime.now() if study_session.completed else None
-    db.session.commit()
 
     if study_session.completed:
+        study_session.completed_at = datetime.now()
+        study_session.status = "completed"
+        study_session.completed_hours = study_session.duration_hours
+
         flash("Nice work! Session marked complete.")
+
     else:
+        study_session.completed_at = None
+        study_session.status = "scheduled"
+        study_session.completed_hours = 0.0
+
         flash("Session marked incomplete.")
+
+    db.session.commit()
+
     return redirect(url_for("schedule"))
+
 
 
 app.config["CANVAS_ALLOWED_HOSTS"] = tuple(
