@@ -64,10 +64,14 @@ def test_mark_complete_and_incomplete_persists(planner):
     assert post(owner, f"/sessions/{first}/toggle").status_code == 302
     saved = session(planner, first)
     assert saved.completed is True and saved.completed_at is not None
+    assert saved.status == "completed"
+    assert saved.completed_hours == pytest.approx(saved.duration_hours)
 
     post(owner, f"/sessions/{first}/toggle")
     saved = session(planner, first)
     assert saved.completed is False and saved.completed_at is None
+    assert saved.status == "scheduled"
+    assert saved.completed_hours == 0
 
 
 def test_progress_shows_completed_against_estimated(planner):
@@ -121,3 +125,33 @@ def test_other_user_cannot_delete_assignment(planner):
     assert response.status_code == 404
     with planner.app.app_context():
         assert planner.db.session.get(planner.Assignment, assignment_id) is not None
+
+def test_rescheduling_migration_preserves_old_completion_data(tmp_path):
+    import sqlite3
+    from sqlalchemy import create_engine
+    from migrations import upgrade_session_rescheduling
+
+    path = tmp_path / "legacy_sessions.db"
+    with sqlite3.connect(path) as connection:
+        connection.executescript("""
+            CREATE TABLE study_session (
+                id INTEGER PRIMARY KEY,
+                completed BOOLEAN NOT NULL,
+                duration_hours FLOAT NOT NULL
+            );
+            INSERT INTO study_session VALUES (1, 1, 1.5);
+            INSERT INTO study_session VALUES (2, 0, 2.0);
+        """)
+
+    engine = create_engine(f"sqlite:///{path}")
+    try:
+        upgrade_session_rescheduling(engine)
+        upgrade_session_rescheduling(engine)  # safe to rerun
+    finally:
+        engine.dispose()
+
+    with sqlite3.connect(path) as connection:
+        rows = connection.execute(
+            "SELECT id, status, completed_hours FROM study_session ORDER BY id"
+        ).fetchall()
+    assert rows == [(1, "completed", 1.5), (2, "scheduled", 0.0)]

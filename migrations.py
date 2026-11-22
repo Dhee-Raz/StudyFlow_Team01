@@ -71,7 +71,6 @@ def upgrade_study_availability(engine):
             raise
 
 
-        
 def upgrade_session_rescheduling(engine):
     """Add SCRUM-35 session tracking fields to an existing SQLite database."""
     if engine.dialect.name != "sqlite":
@@ -124,6 +123,7 @@ def upgrade_session_rescheduling(engine):
         except Exception:
             connection.rollback()
             raise
+
 
 def upgrade_assignment_progress(engine):
     """Idempotently add Assignment.status for progress tracking (Sprint 3).
