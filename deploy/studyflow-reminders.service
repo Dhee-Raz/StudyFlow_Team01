@@ -1,0 +1,23 @@
+# Linux/systemd example. Adjust user and paths to match the web deployment.
+[Unit]
+Description=StudyFlow deadline email reminder worker
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=studyflow
+Group=studyflow
+WorkingDirectory=/opt/studyflow
+EnvironmentFile=/etc/studyflow/reminders.env
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/opt/studyflow/.venv/bin/python -m flask --app app reminders-check
+ExecStart=/opt/studyflow/.venv/bin/python -m flask --app app reminders --loop --interval 60
+Restart=on-failure
+RestartSec=15
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

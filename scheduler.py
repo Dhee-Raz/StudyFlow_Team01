@@ -128,7 +128,14 @@ def plan_sessions(assignments, today, daily_capacity=DEFAULT_DAILY_CAPACITY_HOUR
         remaining = max(0.0, (assignment.estimated_hours or 0.0) - done)
         return (assignment.due_date, -remaining, assignment.id)
 
-    ordered = sorted((a for a in assignments if a.due_date is not None),
+    # Assignments the student marked Completed never receive new sessions.
+    for assignment in assignments:
+        if getattr(assignment, "status", None) == "completed":
+            summaries[assignment.id] = {"remaining": 0.0, "scheduled": 0.0,
+                                        "unscheduled": 0.0, "status": "completed"}
+
+    ordered = sorted((a for a in assignments if a.due_date is not None
+                      and getattr(a, "status", None) != "completed"),
                      key=priority_key)
     for assignment in ordered:
         done = completed_hours_by_assignment.get(assignment.id, 0.0)
@@ -179,7 +186,8 @@ def refresh_saved_sessions(db, user_id, today, daily_capacity=DEFAULT_DAILY_CAPA
     - Completed sessions are never changed or deleted.
     - An existing upcoming session for the same assignment and day is
       updated in place instead of creating a duplicate.
-    - Upcoming sessions that are no longer needed are removed.
+    - Upcoming sessions that are no longer needed are removed, including
+      every upcoming session of an assignment marked Completed.
 
     Returns the per-assignment summaries from plan_sessions().
     """

@@ -6,6 +6,32 @@
     <h1>Study Schedule</h1>
     <p>Your upcoming sessions, spread out day by day. <a href="{{ url_for('study_availability') }}">Change availability</a></p>
   </div>
+  <section class="card">
+    <div class="card-body">
+      <form method="post" action="{{ url_for('save_schedule_history') }}" class="form">
+        <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+        <label for="history_days">Schedule history</label>
+        <select id="history_days" name="history_days">
+          {% for value, label in history_options.items() %}
+          <option value="{{ value }}" {% if value == history_choice %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Apply filter</button>
+      </form>
+      <p>All upcoming sessions remain accessible. Overall progress includes all dates.</p>
+      {% if older_overdue %}
+      <details>
+        <summary>Older overdue work ({{ older_overdue|length }})</summary>
+        <ul>
+          {% for item in older_overdue %}
+          <li>{{ item.assignment.title }} — {{ item.assignment.course.name }} — due {{ item.assignment.due_date.strftime('%b %d, %Y') }} — {{ "%.2f"|format(item.remaining) }} estimated hours remaining</li>
+          {% endfor %}
+        </ul>
+        <p>Study hours are not a confirmation of submission. Check your course for submission status.</p>
+      </details>
+      {% endif %}
+    </div>
+  </section>
   {% if unscheduled %}
   <section class="card" role="status" aria-label="Study capacity warning">
     <div class="card-body">
@@ -22,31 +48,68 @@
   </section>
   {% endif %}
 
-  {% if progress %}
-  <section class="card">
+  <section class="card progress-card" aria-label="Assignment progress">
+    <div class="card-header">
+      <h2>Assignment Progress</h2>
+      {% if progress %}<span class="badge">{{ completed_count }} of {{ progress|length }} completed</span>{% endif %}
+    </div>
     <div class="card-body">
-      <h3>Your Study Progress</h3>
-      {% for entry in progress %}
-      <p><span class="progress-title">{{ entry.title }}</span>: {{ "%.2f"|format(entry.done) }} of {{ "%.2f"|format(entry.total) }} hrs completed ({{ entry.percent }}%)</p>
-      {% endfor %}
+      <div class="progress-summary">
+        <p class="progress-totals">
+          <strong>{{ "%g"|format(completed_hours) }} hrs</strong> completed &middot;
+          <strong>{{ "%g"|format(remaining_hours) }} hrs</strong> remaining
+          <span class="meta">({{ progress_percent }}% of {{ "%g"|format(estimated_hours) }} hrs)</span>
+        </p>
+        <progress class="progress-bar" value="{{ progress_percent }}" max="100" aria-label="Overall study progress">{{ progress_percent }}%</progress>
+      </div>
+
+      {% if not progress %}
+        <p class="no-assignments">No assignments yet. <a href="{{ url_for('add_assignment') }}">Add one</a> to start tracking progress.</p>
+      {% else %}
+      <ul class="assignment-list progress-list">
+        {% for entry in progress %}
+        <li class="progress-row status-{{ entry.status }}" id="progress-{{ entry.id }}">
+          <div class="progress-row-head">
+            <span>
+              <span class="progress-title">{{ entry.title }}</span>
+              {% if entry.assignment.due_date %}<span class="meta">Due {{ entry.assignment.due_date.strftime("%b %d") }}</span>{% endif %}
+            </span>
+            <span class="status-pill status-{{ entry.status }}">{{ status_labels[entry.status] }}</span>
+          </div>
+          <progress class="progress-bar" value="{{ entry.percent }}" max="100" aria-label="{{ entry.title }} progress">{{ entry.percent }}%</progress>
+          <p class="progress-hours">
+            {% if entry.status == "completed" %}
+            Marked completed &middot; {{ "%.2f"|format(entry.done) }} hrs logged
+            {% else %}
+            {{ "%.2f"|format(entry.done) }} of {{ "%.2f"|format(entry.total) }} hrs completed ({{ entry.percent }}%) &middot; {{ "%.2f"|format(entry.remaining) }} hrs remaining
+            {% endif %}
+          </p>
+          <div class="progress-controls">
+            <form method="post" action="{{ url_for('update_assignment_status', assignment_id=entry.id) }}" class="inline-form">
+              <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+              <label for="status-{{ entry.id }}">Status</label>
+              <select id="status-{{ entry.id }}" name="status">
+                {% for value, label in status_labels.items() %}
+                <option value="{{ value }}" {% if value == entry.status %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-secondary btn-small">Update</button>
+            </form>
+            {% if entry.status != "completed" %}
+            <form method="post" action="{{ url_for('update_remaining_hours', assignment_id=entry.id) }}" class="inline-form">
+              <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+              <label for="remaining-{{ entry.id }}">Hours left</label>
+              <input id="remaining-{{ entry.id }}" name="remaining_hours" type="number" min="0" max="1000" step="0.25" value="{{ '%g'|format(entry.remaining) }}">
+              <button type="submit" class="btn btn-secondary btn-small">Save estimate</button>
+            </form>
+            {% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
     </div>
   </section>
-  {% endif %}
-
-
-<section class="card">
-    <h2>Study Progress</h2>
-
-
-<p>{{ "%.2f"|format(completed_hours) }} of {{ "%.2f"|format(estimated_hours) }} hrs completed ({{ progress_percent }}%)</p>
-
-
-    <progress
-        value="{{ progress_percent }}"
-        max="100"
-        style="width: 100%;">
-    </progress>
-</section>
 
   {% if due_today %}
   <section class="card today-card">
@@ -121,7 +184,7 @@
   {% if not visible_days and not extra_days %}
     <div class="empty-state">
       <span class="icon">🗓️</span>
-      No upcoming study sessions yet. <a href="{{ url_for('add_assignment') }}">Add an assignment</a> to generate a schedule.
+      No upcoming study sessions or past sessions in this date range. <a href="{{ url_for('add_assignment') }}">Add an assignment</a> to generate a schedule.
     </div>
   {% else %}
     {% for day, sessions in visible_days %}

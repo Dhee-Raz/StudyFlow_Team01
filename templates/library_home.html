@@ -1,0 +1,90 @@
+{# Course Library home: one card per course, plus search across course, PDF, and note titles. #}
+{% extends "base.html" %}
+{% block title %}Library - StudyFlow{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1>Course Library</h1>
+    <p>Lecture slides, study guides, and class notes, organized by course.</p>
+  </div>
+
+  <form method="get" action="{{ url_for('library.library_home') }}" class="library-search">
+    <input type="search" name="q" value="{{ q }}" maxlength="100"
+           placeholder="Search courses, PDFs, and notes" aria-label="Search the library">
+    <button type="submit" class="btn btn-primary">Search</button>
+    {% if q %}<a class="btn btn-secondary" href="{{ url_for('library.library_home') }}">Clear</a>{% endif %}
+  </form>
+
+  {% if results is not none %}
+    {% if not (results.courses or results.materials or results.notes) %}
+      <div class="empty-state">
+        <span class="icon">🔎</span>
+        Nothing matched “{{ q }}”.
+      </div>
+    {% else %}
+      <div class="course-stack">
+        {% if results.courses %}
+          <section class="card course-card">
+            <div class="card-header"><h2>Courses</h2><span class="badge">{{ results.courses|length }}</span></div>
+            <div class="card-body">
+              <ul class="assignment-list">
+                {% for course in results.courses %}
+                  <li><a href="{{ url_for('library.course_library', course_id=course.id) }}"><strong>{{ course.name }}</strong></a></li>
+                {% endfor %}
+              </ul>
+            </div>
+          </section>
+        {% endif %}
+        {% if results.materials %}
+          <section class="card course-card">
+            <div class="card-header"><h2>PDFs</h2><span class="badge">{{ results.materials|length }}</span></div>
+            <div class="card-body">
+              <ul class="assignment-list">
+                {% for material in results.materials %}
+                  <li>
+                    <a href="{{ url_for('library.view_material', material_id=material.id) }}" target="_blank" rel="noopener"><strong>{{ material.title }}</strong></a>
+                    <span class="meta">in <a href="{{ url_for('library.course_library', course_id=material.course_id) }}">{{ material.course.name }}</a></span>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </section>
+        {% endif %}
+        {% if results.notes %}
+          <section class="card course-card">
+            <div class="card-header"><h2>Notes</h2><span class="badge">{{ results.notes|length }}</span></div>
+            <div class="card-body">
+              <ul class="assignment-list">
+                {% for note in results.notes %}
+                  <li>
+                    <strong>{{ note.title }}</strong>
+                    <span class="meta">in <a href="{{ url_for('library.course_library', course_id=note.course_id) }}">{{ note.course.name }}</a></span>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </section>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% elif not courses %}
+    <div class="empty-state">
+      <span class="icon">📚</span>
+      No courses yet. <a href="{{ url_for('add_course') }}">Add a course</a> to start building its library.
+    </div>
+  {% else %}
+    <div class="course-stack">
+      {% for course in courses %}
+        <section class="card course-card">
+          <div class="card-header">
+            <h2>{{ course.name }}</h2>
+            <span class="header-actions">
+              <span class="badge">{{ course.materials|length }} PDF{{ '' if course.materials|length == 1 else 's' }}</span>
+              <span class="badge">{{ course.notes|length }} note{{ '' if course.notes|length == 1 else 's' }}</span>
+              <a class="btn btn-secondary btn-small" href="{{ url_for('library.course_library', course_id=course.id) }}">Open</a>
+            </span>
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

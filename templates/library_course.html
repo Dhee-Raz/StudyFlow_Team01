@@ -1,0 +1,106 @@
+{# One course's materials: PDF upload/list and plain-text notes. #}
+{% extends "base.html" %}
+{% block title %}{{ course.name }} Library - StudyFlow{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <p><a href="{{ url_for('library.library_home') }}">&larr; All courses</a></p>
+    <h1>{{ course.name }}</h1>
+    <p>Lecture slides, study guides, and class notes.</p>
+  </div>
+
+  <form method="get" action="{{ url_for('library.course_library', course_id=course.id) }}" class="library-search">
+    <input type="search" name="q" value="{{ q }}" maxlength="100"
+           placeholder="Search this course by title" aria-label="Search this course">
+    <button type="submit" class="btn btn-primary">Search</button>
+    {% if q %}<a class="btn btn-secondary" href="{{ url_for('library.course_library', course_id=course.id) }}">Clear</a>{% endif %}
+  </form>
+
+  <div class="course-stack">
+    <section class="card course-card">
+      <div class="card-header">
+        <h2>PDFs</h2>
+        <span class="badge">{{ materials|length }}</span>
+      </div>
+      <div class="card-body">
+        {% if materials %}
+          <ul class="assignment-list">
+            {% for material in materials %}
+              <li class="library-row">
+                <div class="library-row-main">
+                  <strong>{{ material.title }}</strong>
+                  <span class="meta">{{ material.original_filename }} · {{ (material.size_bytes / 1024)|round(0)|int }} KB · added {{ material.created_at.strftime("%b %d, %Y") }}</span>
+                </div>
+                <span class="header-actions">
+                  <a class="btn btn-secondary btn-small" href="{{ url_for('library.view_material', material_id=material.id) }}" target="_blank" rel="noopener">View</a>
+                  <a class="btn btn-secondary btn-small" href="{{ url_for('library.download_material', material_id=material.id) }}">Download</a>
+                  <form method="post" action="{{ url_for('library.delete_material', material_id=material.id) }}" class="confirm-delete" data-confirm="Delete &ldquo;{{ material.title }}&rdquo;? This cannot be undone.">
+                    <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+                    <button type="submit" class="icon-btn" aria-label="Delete {{ material.title }}" title="Delete PDF">
+                      <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 6h12M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6m-6.5 0 .6 9.4A1.5 1.5 0 0 0 7.6 17h4.8a1.5 1.5 0 0 0 1.5-1.6L14.5 6" />
+                      </svg>
+                    </button>
+                  </form>
+                </span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="no-assignments">{{ 'No PDFs match your search.' if q else 'No PDFs yet. Upload one below.' }}</p>
+        {% endif %}
+
+        <form class="form library-form" method="post" enctype="multipart/form-data"
+              action="{{ url_for('library.upload_material', course_id=course.id) }}">
+          <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+          <label for="material-file">Upload a PDF (up to {{ max_pdf_mb }} MB)</label>
+          <input id="material-file" name="file" type="file" accept="application/pdf,.pdf" required>
+          <label for="material-title">Title (optional)</label>
+          <input id="material-title" name="title" type="text" maxlength="200" placeholder="Chapter 14 Notes">
+          <button type="submit">Upload PDF</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="card course-card">
+      <div class="card-header">
+        <h2>Notes</h2>
+        <span class="badge">{{ notes|length }}</span>
+      </div>
+      <div class="card-body">
+        {% if notes %}
+          {% for note in notes %}
+            <details class="library-note">
+              <summary>
+                <strong>{{ note.title }}</strong>
+                <span class="meta">updated {{ note.updated_at.strftime("%b %d, %Y") }}</span>
+              </summary>
+              <form class="form library-form" method="post" action="{{ url_for('library.update_note', note_id=note.id) }}">
+                <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+                <label for="note-title-{{ note.id }}">Title</label>
+                <input id="note-title-{{ note.id }}" name="title" type="text" maxlength="200" required value="{{ note.title }}">
+                <label for="note-body-{{ note.id }}">Note</label>
+                <textarea id="note-body-{{ note.id }}" name="body" rows="6" maxlength="20000">{{ note.body }}</textarea>
+                <button type="submit">Save changes</button>
+              </form>
+              <form method="post" action="{{ url_for('library.delete_note', note_id=note.id) }}" class="confirm-delete library-note-delete" data-confirm="Delete the note &ldquo;{{ note.title }}&rdquo;? This cannot be undone.">
+                <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+                <button type="submit" class="btn btn-danger btn-small">Delete note</button>
+              </form>
+            </details>
+          {% endfor %}
+        {% else %}
+          <p class="no-assignments">{{ 'No notes match your search.' if q else 'No notes yet. Add one below.' }}</p>
+        {% endif %}
+
+        <form class="form library-form" method="post" action="{{ url_for('library.add_note', course_id=course.id) }}">
+          <input type="hidden" name="_csrf_token" value="{{ form_csrf_token() }}">
+          <label for="new-note-title">New note title</label>
+          <input id="new-note-title" name="title" type="text" maxlength="200" required placeholder="Important Formulas">
+          <label for="new-note-body">Note</label>
+          <textarea id="new-note-body" name="body" rows="5" maxlength="20000"></textarea>
+          <button type="submit">Add note</button>
+        </form>
+      </div>
+    </section>
+  </div>
+{% endblock %}
