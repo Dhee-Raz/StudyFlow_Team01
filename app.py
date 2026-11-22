@@ -11,11 +11,18 @@ from models import db, Course, Assignment, PersonalTask, StudySession, ASSIGNMEN
 from scheduler import generate_study_sessions, refresh_saved_sessions
 from presentation import course_groups, schedule_sections
 from canvas_connection import register_canvas
+
 from reminders import register_reminders
 from library import register_library, remove_stored_files
-from migrations import upgrade_canvas_import, upgrade_study_availability, upgrade_assignment_progress
-from migrations import upgrade_schedule_history
 from schedule_history import history_view, HISTORY_OPTIONS
+from migrations import (
+    upgrade_canvas_import,
+    upgrade_study_availability,
+    upgrade_session_rescheduling,
+    upgrade_assignment_progress,
+    upgrade_schedule_history,
+)
+
 
 @event.listens_for(Engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
@@ -31,10 +38,12 @@ app.config["SECRET_KEY"] = os.environ.get("STUDYFLOW_SECRET_KEY", "dev-secret-ke
 db.init_app(app)
 app.register_blueprint(auth)
 register_library(app)
+
 with app.app_context():
     db.create_all()
     upgrade_canvas_import(db.engine)
     upgrade_study_availability(db.engine)
+    upgrade_session_rescheduling(db.engine)
     upgrade_assignment_progress(db.engine)
     upgrade_schedule_history(db.engine)
 
@@ -536,27 +545,45 @@ def schedule():
 
 
 
+
+
+
 @app.route("/sessions/<int:session_id>/toggle", methods=["POST"])
 @login_required
 def toggle_session(session_id):
     """Mark a study session complete or incomplete (owner only)."""
-    # Filtering by user_id means other users get a 404, not someone else's session.
+
+    # Only allow the session owner to make changes.
     study_session = StudySession.query.filter_by(
-        id=session_id, user_id=current_user().id
+        id=session_id,
+        user_id=current_user().id
     ).first_or_404()
 
+    # Toggle the session completion status.
     study_session.completed = not study_session.completed
-    study_session.completed_at = datetime.now() if study_session.completed else None
-    # Recording study time starts the assignment automatically.
+
     assignment = study_session.assignment
-    if study_session.completed and assignment.status == "not_started":
-        assignment.status = "in_progress"
-    db.session.commit()
 
     if study_session.completed:
+        study_session.completed_at = datetime.now()
+        study_session.status = "completed"
+        study_session.completed_hours = study_session.duration_hours
+
+        # Start the assignment when study time is recorded.
+        if assignment.status == "not_started":
+            assignment.status = "in_progress"
+
         flash("Nice work! Session marked complete.")
+
     else:
+        study_session.completed_at = None
+        study_session.status = "scheduled"
+        study_session.completed_hours = 0.0
+
         flash("Session marked incomplete.")
+
+    db.session.commit()
+
     return redirect(url_for("schedule"))
 
 

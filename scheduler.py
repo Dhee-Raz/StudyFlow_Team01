@@ -188,6 +188,8 @@ def refresh_saved_sessions(db, user_id, today, daily_capacity=DEFAULT_DAILY_CAPA
       updated in place instead of creating a duplicate.
     - Upcoming sessions that are no longer needed are removed, including
       every upcoming session of an assignment marked Completed.
+    - Missed, incomplete sessions are replaced with new sessions on remaining
+      available days; daily capacity and deadlines still limit scheduling.
 
     Returns the per-assignment summaries from plan_sessions().
     """
@@ -220,7 +222,8 @@ def refresh_saved_sessions(db, user_id, today, daily_capacity=DEFAULT_DAILY_CAPA
         if key in plan and key not in existing:
             existing[key] = session
         else:
-            # Old, duplicate, or no longer needed -> remove it.
+            # Old, missed, duplicate, or no longer needed: replace through the
+            # current plan. Unfinished hours are still part of the remaining work.
             db.session.delete(session)
 
     for (assignment_id, day), hours in plan.items():

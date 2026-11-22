@@ -173,6 +173,20 @@ class StudySession(db.Model):
     duration_hours = db.Column(db.Float, nullable=False)
     completed = db.Column(db.Boolean, nullable=False, default=False)
     completed_at = db.Column(db.DateTime, nullable=True)
+    
+    # SCRUM-35: Track the status and work recorded for each study session.
+    status = db.Column(
+        db.String(20),
+        nullable=False,
+        default="scheduled",
+        server_default="scheduled",
+    )
+    completed_hours = db.Column(
+        db.Float,
+        nullable=False,
+        default=0.0,
+        server_default="0.0",
+    )
     created_at = db.Column(
         db.DateTime,
         default=lambda: datetime.now(timezone.utc),

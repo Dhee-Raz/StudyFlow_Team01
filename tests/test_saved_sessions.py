@@ -150,3 +150,51 @@ def test_deleting_assignment_deletes_its_sessions(planner):
     planner.db.session.delete(assignment)
     planner.db.session.commit()
     assert saved(planner, user) == []
+
+# ----- automatic rescheduling of missed sessions (SCRUM-35) -----------------
+
+def test_missed_session_hours_are_rescheduled_on_remaining_days(planner):
+    from scheduler import refresh_saved_sessions
+
+    user, assignment = seed(planner, hours=6, days_until_due=3)
+    refresh_saved_sessions(planner.db, user.id, TODAY)
+    original = saved(planner, user)
+    assert len(original) == 3
+    assert sorted(s.duration_hours for s in original) == [2.0, 2.0, 2.0]
+
+    # The student misses the first session. Refreshing tomorrow must keep all
+    # unfinished hours but schedule them only on the remaining available days.
+    tomorrow = TODAY + timedelta(days=1)
+    refresh_saved_sessions(planner.db, user.id, tomorrow)
+    rescheduled = saved(planner, user)
+    assert len(rescheduled) == 2
+    assert sorted(s.session_date for s in rescheduled) == [
+        tomorrow, tomorrow + timedelta(days=1)
+    ]
+    assert sum(s.duration_hours for s in rescheduled) == pytest.approx(6.0)
+    assert all(
+        not s.completed and s.status == "scheduled" and s.completed_hours == 0
+        for s in rescheduled
+    )
+
+    # Repeated page refreshes must not create duplicate sessions.
+    ids = sorted(s.id for s in rescheduled)
+    refresh_saved_sessions(planner.db, user.id, tomorrow)
+    assert sorted(s.id for s in saved(planner, user)) == ids
+
+
+def test_missed_session_rescheduling_respects_daily_capacity(planner):
+    from scheduler import refresh_saved_sessions
+
+    user, assignment = seed(planner, hours=10, days_until_due=3)
+    refresh_saved_sessions(planner.db, user.id, TODAY, daily_capacity=4)
+    tomorrow = TODAY + timedelta(days=1)
+    summaries = refresh_saved_sessions(
+        planner.db, user.id, tomorrow, daily_capacity=4
+    )
+
+    upcoming = saved(planner, user)
+    assert len(upcoming) == 2
+    assert all(s.session_date >= tomorrow for s in upcoming)
+    assert sum(s.duration_hours for s in upcoming) == pytest.approx(8.0)
+    assert summaries[assignment.id]["unscheduled"] == pytest.approx(2.0)
