@@ -96,6 +96,19 @@ stateDiagram-v2
     end note
 ```
 
+
+### Detailed scheduling flowchart (image)
+
+The diagram below shows how the Schedule page loads assignments, counts completed hours, prioritizes deadlines and remaining workload, and saves updated study sessions. Missed unfinished work is recalculated when the student opens the Schedule page. Completed sessions are preserved, and work that cannot fit is reported as unscheduled.
+
+![Detailed StudyFlow scheduling and rescheduling flowchart](docs/images/studyflow-scheduling-flowchart.jpeg)
+
+### Detailed database entity-relationship diagram (image)
+
+This diagram expands on the overview above by showing the primary fields and relationships among users, courses, assignments, study sessions, reminders, course materials, notes, and assignment memos. It is an illustrative overview; `models.py` remains the source of truth for current field definitions.
+
+![Detailed StudyFlow database entity-relationship diagram](docs/images/studyflow-data-model.jpeg)
+
 ---
 
 ## Prerequisites
