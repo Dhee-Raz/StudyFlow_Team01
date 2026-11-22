@@ -2,6 +2,102 @@
 
 A tool that generates a personalized study schedule using spaced repetition.
 
+## Project diagrams (Sprint 3)
+
+These diagrams document the current StudyFlow application structure and the student-facing workflows. They complement the setup instructions and feature documentation below.
+
+### System architecture
+
+The Flask application connects authentication, scheduling, Canvas integration, course resources, and email reminders to the application database and external services.
+
+```mermaid
+flowchart TB
+    Student["Student (web browser)"]
+    subgraph Flask["StudyFlow Flask application"]
+      App["app.py: courses, assignments, calendar, availability, schedule, progress"]
+      Auth["auth.py: registration and login"]
+      Sched["scheduler.py: study-session planning"]
+      History["schedule_history.py: schedule date filter"]
+      Library["library.py: PDFs, notes and memos"]
+      Canvas["canvas_connection.py / canvas_import.py: Canvas sync"]
+      Reminders["reminders.py: reminder settings and worker"]
+    end
+    DB[("SQLite database / SQLAlchemy models")]
+    Files[("Uploaded course files")]
+    LMS[("Canvas LMS")]
+    Mail[("Resend email service")]
+    Student --> App
+    Student --> Auth
+    Student --> Library
+    Student --> Canvas
+    Student --> Reminders
+    App --> Sched
+    App --> History
+    Auth --> DB
+    App --> DB
+    Sched --> DB
+    Library --> DB
+    Library --> Files
+    Canvas --> LMS
+    Canvas --> DB
+    Reminders --> DB
+    Reminders --> Mail
+```
+
+### Data model overview
+
+The main relationships connect students to courses, assignments, study sessions, notes, and notifications. This is a high-level overview; see `models.py` for the authoritative schema.
+
+```mermaid
+erDiagram
+    USER ||--o{ COURSE : owns
+    USER ||--o{ PERSONAL_TASK : owns
+    USER ||--o{ STUDY_SESSION : has
+    USER ||--o| REMINDER_PREFERENCE : configures
+    COURSE ||--o{ ASSIGNMENT : contains
+    COURSE ||--o{ COURSE_NOTE : contains
+    COURSE ||--o{ COURSE_MATERIAL : contains
+    ASSIGNMENT ||--o{ STUDY_SESSION : scheduled_as
+    ASSIGNMENT ||--o| ASSIGNMENT_MEMO : has
+    ASSIGNMENT ||--o{ DEADLINE_NOTIFICATION : triggers
+```
+
+### Student journey
+
+Students can manually create courses and assignments or import from Canvas, set availability, use the generated schedule, and track progress. Reminders and course resources are optional supporting features.
+
+```mermaid
+flowchart LR
+    Start(["Register / log in"]) --> Source{"How do courses get in?"}
+    Source --> Manual["Add courses and assignments"]
+    Source --> Import["Connect Canvas and import"]
+    Manual --> Availability["Set study availability"]
+    Import --> Availability
+    Availability --> Schedule["Open generated study schedule"]
+    Schedule --> Study["Study and check off sessions"]
+    Study --> Progress["Update status or remaining hours"]
+    Progress --> Schedule
+    Schedule --> Extras["Optional: reminders, notes and PDFs"]
+    Extras --> Schedule
+```
+
+### Assignment progress workflow
+
+```mermaid
+stateDiagram-v2
+    [*] --> NotStarted: Assignment created
+    NotStarted --> InProgress: First session completed or status changed
+    InProgress --> Completed: Work finished
+    NotStarted --> Completed: Mark completed
+    Completed --> InProgress: Reopen work
+    note right of Completed
+      Completed work is excluded
+      from upcoming study sessions
+    end note
+```
+
+---
+
 ## Prerequisites
 - Python 3.9+
 - Git
